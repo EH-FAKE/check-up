@@ -29,7 +29,8 @@ if __name__ == "__main__":
     print(f"Last 24h collecting: {list(ads)}")
     collected_portals = set([a[0] for a in ads])
     if portals != collected_portals:
+        diff = ", ".join(portals - collected_portals)
         msg = "The following portals did not have ads collected in the "\
-            f"last 24h:\n\n: {portals - collected_portals}"
+            f"last 24h:\n\n {diff}"
         print(msg)
         send_email(msg)
