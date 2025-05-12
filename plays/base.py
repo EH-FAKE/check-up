@@ -5,15 +5,14 @@ from typing import List
 
 from playwright.sync_api import TimeoutError as PlayWrightTimeoutError, sync_playwright
 
-from plays.items import AdItem, EntryItem
+from plays.items import EntryItem
 from plays.timeout import PlayerTimeoutError
-from plays.exceptions import NotEnoughADSFound, ScraperNotFoundError
+from plays.exceptions import ScraperNotFoundError
 from plog import logger
 
 
 class BasePlay:
     name = "base"
-    n_expected_ads = 0
 
     def __init__(
         self,
@@ -58,15 +57,6 @@ class BasePlay:
 
         return self.session_dir
 
-    def take_screenshot(self, page, url, goto=True, timeout=30_000):
-        logger.info(f"[{self.name}] Taking screenshot of '{url}'...")
-        temp_file = NamedTemporaryFile(suffix=".png", delete=False)
-        if goto:
-            page.goto(url)
-        page.screenshot(full_page=True, path=temp_file.name, timeout=timeout)
-        logger.info("Done!")
-        return temp_file.name
-
     def scroll_down(self, page, n, amount=300, wait_time=1):
         for _ in range(n):
             page.mouse.wheel(0, amount)
@@ -90,22 +80,6 @@ class BasePlay:
             **kwargs,
         )
 
-    def take_ads_screenshot(self, ad_items: List[AdItem]):
-        logger.info(f"[{self.name}] Taking ADs screenshots")
-        with sync_playwright() as p:
-            browser = self.launch_browser(p)
-            page = browser.new_page()
-            for ad in ad_items:
-                try:
-                    screenshot_path = self.take_screenshot(page, ad.url, goto=True)
-                except Exception:
-                    screenshot_path = None
-                finally:
-                    ad.screenshot_path = screenshot_path
-
-        logger.info("Done!")
-        return ad_items
-
     def remove_session(self):
         if self.allow_remove_session:
             try:
@@ -116,12 +90,8 @@ class BasePlay:
                 logger.error(
                     f"[{self.name}] Error deleting session dir: '{self.get_session_dir()}'"
                 )
-
         else:
             logger.info(f"[{self.name}] Removing session not allowed...")
-
-    def not_enough_items(self, entry_item: EntryItem):
-        return entry_item is None or len(entry_item.ads) < self.n_expected_ads
 
     def pre_run(self):
         raise NotImplementedError()
@@ -135,28 +105,25 @@ class BasePlay:
     def execute(self, retries=2):
         entry_item = None
         self.pre_run()
-        while self.not_enough_items(entry_item) and retries >= 0:
+        while entry_item is None and retries >= 0:
             try:
                 entry_item = self.run()
-                logger.info(f"[{self.name}]: Found {len(entry_item.ads)} items.")
+                logger.info(f"[{self.name}]: Successfully scraped content.")
             except PlayWrightTimeoutError as exc:
                 logger.error(str(exc))
             except PlayerTimeoutError as exc:
                 logger.error(str(exc))
 
-            if self.not_enough_items(entry_item):
+            if entry_item is None:
                 logger.warning(
-                    f"[{self.name}] Not enough ADs were found with '{self.name}'."
-                    f" Trying again. Remaining {retries}"
+                    f"[{self.name}] Failed to scrape content. Trying again. Remaining {retries}"
                 )
                 # Remove session and login again. It sometimes work
                 self.remove_session()
                 retries -= 1
 
-        if self.not_enough_items(entry_item):
-            raise NotEnoughADSFound(f"[{self.name}] Not enough ads were found in '{self.url}'")
+        if entry_item is None:
+            raise Exception(f"[{self.name}] Failed to scrape content from '{self.url}'")
 
         entry_item = self.post_run(entry_item)
-        if entry_item is not None:
-            entry_item.ads = self.take_ads_screenshot(entry_item.ads)
         return entry_item

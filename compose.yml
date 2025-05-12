@@ -7,6 +7,7 @@ services:
       context: .
     container_name: healthcheck_scraper
     volumes:
+      - .:/project/
       - ./sessions/:/project/sessions/
       - ./logs/:/var/log/
     tty: true
@@ -23,4 +24,6 @@ services:
 
 volumes:
   pgdata:
+    driver: local
+  minio_data:
     driver: local

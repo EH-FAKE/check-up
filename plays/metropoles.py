@@ -3,27 +3,16 @@ import time
 from playwright.sync_api import sync_playwright
 
 from plays.base import BasePlay
-from plays.items import AdItem, EntryItem
-from plays.utils import get_or_none
+from plays.items import EntryItem
 from plog import logger
 
 
 class MetropolesPlay(BasePlay):
     name = "metropoles"
-    n_expected_ads = 10
 
     @classmethod
     def match(cls, url):
         return "metropoles.com" in url
-
-    def find_items(self, html_content) -> AdItem:
-        return AdItem(
-            title=get_or_none(r'title="(.*?)"', html_content),
-            url=get_or_none(r'href="(.*?)"', html_content),
-            thumbnail_url=get_or_none(r'url\(&quot;(.*?)&quot;\)', html_content),
-            tag=get_or_none(r'<span class="branding-inner".*?>(.*?)<\/span>', html_content),
-            excerpt=get_or_none(r'slot="description" title="(.*?)"', html_content),
-        )
 
     def pre_run(self):
         pass
@@ -34,37 +23,64 @@ class MetropolesPlay(BasePlay):
             page = browser.new_page()
             logger.info(f"[{self.name}] Opening URL '{self.url}'...")
             page.goto(self.url, timeout=180_000)
-            logger.info(f"[{self.name}] Searching for ads...")
-            try:
-                page.locator("#taboola-below-article-thumbnails").scroll_into_view_if_needed()
-            except Exception:
-                logger.warning(
-                    f"[{self.name}] Timeout error waiting for 'taboola-below-article-thumbnails'"
-                )
-            time.sleep(self.wait_time * 2)
-
-            entry_screenshot_path = self.take_screenshot(page, self.url, goto=False)
+            
+            # Wait for the main content to be visible
+            page.wait_for_selector("h1", timeout=30000)
+            
+            # Extract article content
             entry_title = page.locator("//h1").first.inner_text()
-
-            self.scroll_down(page, 20, amount=500)
-
-            elements = page.locator(".videoCube")
-            ad_items = []
-            visible_elements = []
-            time.sleep(self.wait_time)
-            for i in range(elements.count()):
-                element = elements.nth(i)
-                if not element.is_visible():
-                    continue
-
-                visible_elements.append(element)
-                content = element.inner_html()
-                ad_item = self.find_items(content)
-                ad_items.append(ad_item)
+            
+            # Extract description from noticiaCabecalho__subtitulo
+            description = ""
+            try:
+                description = page.locator(".noticiaCabecalho__subtitulo").inner_text()
+            except Exception:
+                logger.warning(f"[{self.name}] Failed to extract description")
+            
+            # Extract article body with multiple attempts
+            body = ""
+            try:
+                # Try different possible selectors for the content
+                selectors = [
+                    ".m-content",
+                    "article",
+                    ".article-content",
+                    ".content"
+                ]
+                
+                for selector in selectors:
+                    try:
+                        logger.info(f"[{self.name}] Trying to extract body with selector: {selector}")
+                        content_element = page.locator(selector)
+                        if content_element.count() > 0:
+                            body = content_element.inner_text()
+                            if body.strip():
+                                logger.info(f"[{self.name}] Successfully extracted body using selector: {selector}")
+                                break
+                    except Exception as e:
+                        logger.debug(f"[{self.name}] Failed with selector {selector}: {str(e)}")
+                        continue
+                
+                if not body.strip():
+                    logger.warning(f"[{self.name}] Failed to extract article body with any selector")
+            except Exception as e:
+                logger.warning(f"[{self.name}] Failed to extract article body: {str(e)}")
+            
+            # Extract tags from the new structure
+            tags = []
+            try:
+                tag_elements = page.locator(".TagsNoticiaWrapper-sc-pr4a71-0 a")
+                for i in range(tag_elements.count()):
+                    tag_text = tag_elements.nth(i).inner_text().strip()
+                    if tag_text:
+                        tags.append(tag_text)
+            except Exception:
+                logger.warning(f"[{self.name}] Failed to extract tags")
 
             return EntryItem(
                 title=entry_title,
-                ads=ad_items,
                 url=self.url,
-                screenshot_path=entry_screenshot_path,
+                description=description,
+                body=body,
+                tags=tags,
             )

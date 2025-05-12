@@ -25,8 +25,15 @@ class AdItem:
 class EntryItem:
     title: str
     url: str
-    ads: List[AdItem]
+    ads: List[AdItem] = None
     screenshot_path: str | None = None
+    description: str | None = None
+    body: str | None = None
+    tags: List[str] | None = None
+
+    def __post_init__(self):
+        if self.ads is None:
+            self.ads = []
 
     def __str__(self):
         return f"{self.title}: ({self.url[:50]})"

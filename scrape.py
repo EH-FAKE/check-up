@@ -70,6 +70,9 @@ def main():
         portal=portal,
         url=entry_item.url,
         title=entry_item.title,
+        description=entry_item.description,
+        body=entry_item.body,
+        tags=entry_item.tags,
     )
     entry.save_screenshot(session, entry_item.screenshot_path)
     logger.info(f"Saved entry with id: {entry.id}")

@@ -52,8 +52,14 @@ As seguintes tabelas serão criadas:
 
 **Nota:** mais detalhes sobre a estrutura das tabelas estão disponíveis no arquivo `models.py`.
 
+### 2- Executar as migrações do banco de dados
+Para executar as migrações do banco de dados, utilize:
 
-### 2- Coletar URL de notícias
+`make migrate_db`
+
+Este comando irá aplicar todas as migrações pendentes no banco de dados.
+
+### 3- Coletar URL de notícias
 O primeiro passo é coletar URLs de notícias nas páginas iniciais dos portais. Cada portal possui um "spider" implementado com a biblioteca Scrapy, localizado no diretório `spiders/`.
 
 Exemplo de script para a [Folha]("https://www.folha.uol.com.br"): `spiders/folha.py`.
@@ -62,7 +68,7 @@ Para executar a coleta de todos os portais, utilize:
 
 `make crawl`
 
-### 3- Coletar Informações dos anúncios 
+### 4- Coletar Informações dos anúncios 
 
 Após a coleta das notícias, o próximo passo é raspar os anúncios presentes nas páginas das notícias. Esse processo utiliza a biblioteca [Playwright](https://playwright.dev/), para simular a navegação em um browser.
 
@@ -202,3 +208,20 @@ Os endereços S3 das imagens serão registrados no banco de dados do projeto, en
 
 ## Importante
 Os scripts dependem da estrutura HTML dos portais e podem precisar de ajustes após atualizações nos sites.
+
+
+## Executando um spider específico
+
+Para executar apenas um spider específico, você pode passar o nome do spider como argumento:
+
+```
+    docker compose run scraper python crawl.py metropolesspider   
+```
+
+Para verificar o banco de dados, você pode executar o seguinte comando:
+
+```
+    docker compose run scraper python check_db.py
+```
+
+

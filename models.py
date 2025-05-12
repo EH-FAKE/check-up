@@ -11,6 +11,8 @@ from sqlalchemy import (
     ForeignKey,
     Integer,
     String,
+    Text,
+    JSON,
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -61,6 +63,9 @@ class Entry(Base):
     portal_id: Mapped[int] = mapped_column(ForeignKey("portal.id"))
     title = Column(String, nullable=False)
     url = Column(URLType, nullable=False)
+    description = Column(String, nullable=True)
+    body = Column(Text, nullable=True)
+    tags = Column(JSON, nullable=True)
     screenshot = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 

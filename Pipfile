@@ -23,6 +23,7 @@ pydantic = "==2.8.2"
 openai = "==1.41.1"
 pandas = "==2.2.2"
 numpy = "==2.0.1"
+minio = "==7.2.15"
 
 [dev-packages]
 freezegun = "==1.5.1"
