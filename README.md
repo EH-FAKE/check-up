@@ -226,6 +226,8 @@ Para verificar o banco de dados, você pode executar o seguinte comando:
 
 ## Para nosso caso de uso
 
+copiar env.example para .env e configurar as variáveis de ambiente
+
 make start
 make init_db
 make migrate_db
