@@ -19,4 +19,7 @@ crawl_metropoles:
 init_db:
 	docker compose run scraper python create_db.py
 
+migrate_db:
+	docker compose run scraper python migrate_db.py
+
 .PHONY: start scrape scrape_no_openai scrape_fixed scrape_working

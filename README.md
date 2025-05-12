@@ -76,9 +76,9 @@ Para executar a coleta de todos os anúncios basta executar o comando:
 
 `make scrape`
 
-### 4- Adicionar um novo portal
+### 5- Adicionar um novo portal
 
-##### 4.1 - Adicionar novo portal ao Banco de Dados
+##### 5.1 - Adicionar novo portal ao Banco de Dados
 Para adicionar um novo portal as coletas, como por exemplo [Correio Braziliense](https://www.correiobraziliense.com.br/), insira as informações do portal no Banco de Dados:
 
 ```
@@ -87,7 +87,7 @@ make bash
 python add_portal.py "Correio Braziliense" "https://www.correiobraziliense.com.br/"
 ```
 
-##### 4.2 - Criar o spider
+##### 5.2 - Criar o spider
 Crie um arquivo `spiders/correio.py` com o seguinte conteúdo:
 
 ```python
@@ -117,7 +117,7 @@ class CorreioBrazilienseSpider(BaseSpider):
 
 Este script irá buscar novas notícias publicadas na página inicial do Correio Braziliense.
 
-##### 4.3 - Criar o Script Playwright
+##### 5.3 - Criar o Script Playwright
 Também será necessário criar um script Playwright correspondente ao novo portal para coletar anúncios. Crie um arquivo em `plays/correio.py` com o seguinte código:
 
 ```python
@@ -224,4 +224,10 @@ Para verificar o banco de dados, você pode executar o seguinte comando:
     docker compose run scraper python check_db.py
 ```
 
+## Para nosso caso de uso
 
+make start
+make init_db
+make migrate_db
+make crawl_metropoles
+make scrape_no_openai
