@@ -9,7 +9,7 @@ from spiders.rbs import RBSSpider
 from spiders.veja import VejaSpider
 from spiders.terra import TerraSpider
 from spiders.uol import UOLSpider
-
+from spiders.gazetaDoPovo import GazetaDoPovoSpider
 
 __all__ = [
     BaseSpider,
@@ -23,4 +23,5 @@ __all__ = [
     VejaSpider,
     TerraSpider,
     UOLSpider,
+    GazetaDoPovoSpider,
 ]

@@ -8,7 +8,7 @@ from plays.rbs import ClicRBSPlay
 from plays.terra import TerraPlay
 from plays.veja import VejaPlay
 from plays.uol import UOLPlay
-
+from plays.gazetaDoPovo import GazetaDoPovoPlay
 
 __all__ = [
     ClicRBSPlay,
@@ -21,4 +21,5 @@ __all__ = [
     TerraPlay,
     VejaPlay,
     UOLPlay,
+    GazetaDoPovoPlay,
 ]
