@@ -3,92 +3,118 @@ import time
 from playwright.sync_api import sync_playwright
 
 from plays.base import BasePlay
-from plays.items import AdItem, EntryItem
-from plays.utils import get_or_none
+from plays.items import EntryItem
 from plog import logger
 
 
 class UOLPlay(BasePlay):
     name = "uol"
-    n_expected_ads = 4
 
     @classmethod
     def match(cls, url):
-        # TODO: use regex in this matcher
-        for domain in [
-            "noticias.uol.com.br",
-            "www.uol.com.br",
-            "educacao.uol.com.br",
-            "economia.uol.com.br",
-        ]:
-            if domain in url:
-                return True
-
-        return False
+        return "uol.com.br" in url
 
     def pre_run(self):
         pass
 
-    def find_items(self, html_content) -> AdItem:
-        return AdItem(
-            title=get_or_none(r'<div class="ad-description">(.*?)</div>', html_content),
-            url=get_or_none(
-                r'link: {\s*[^}]*\bdefault\b[^}].*?"([^"]+)"',
-                html_content
-            ),
-            thumbnail_url=get_or_none(
-                r'image: {\s*default: "(https://tpc\.googlesyndication\.com/simgad/[\d?]+)"',
-                html_content,
-            ),
-            tag=get_or_none(r'<div class="ad-label-footer">(.*?)</div>', html_content),
-        )
-
-    def get_iframe_items(self, iframe_object):
-        iframe_object.scroll_into_view_if_needed()
-        time.sleep(self.wait_time)
-        frame_content = str(iframe_object.element_handles()[0].content_frame())
-        return self.find_items(frame_content)
-
-    def get_most_read_items(self, page_locator):
-        page_items = page_locator.locator(".solar-headline")
-        n_items = page_items.count()
-        items = []
-        for i in range(n_items):
-            item = page_items.nth(i)
-            html_content = item.inner_html()
-            items.append(
-                AdItem(
-                    url=get_or_none(r'<a href="(.*?)"', html_content),
-                    title=get_or_none(r'aria-label="(.*?)"', html_content),
-                    thumbnail_url=get_or_none(r'source srcset="(.*?)"', html_content),
-                    tag=None,
-                )
-            )
-
-        return items
-
     def run(self) -> EntryItem:
         with sync_playwright() as p:
-            browser = self.launch_browser(p)
+            browser = self.launch_browser(p, viewport={"width": 1920, "height": 1080})
             page = browser.new_page()
             logger.info(f"[{self.name}] Opening URL '{self.url}'...")
-            page.goto(self.url, timeout=60_000)
-            logger.info(f"[{self.name}] Searching for ads...")
-            page.get_by_text("As mais lidas agora").scroll_into_view_if_needed()
-            time.sleep(self.wait_time)
-            ad_items = self.get_iframe_items(
-                page.locator(".type-main").locator("//iframe")
+            page.goto(self.url, timeout=180_000)
+            
+            # Wait for the main content to be visible
+            page.wait_for_selector("h1", timeout=30000)
+            
+            # Extract article title
+            entry_title = ""
+            try:
+                title_selectors = [
+                    "h1.c-content-head__title",  # Notícias
+                    "h1.title",                  # Geral
+                    "h1"                        # Fallback
+                ]
+                for selector in title_selectors:
+                    try:
+                        title_element = page.locator(selector).first
+                        entry_title = title_element.inner_text().strip()
+                        if entry_title:
+                            break
+                    except Exception:
+                        continue
+            except Exception as e:
+                logger.warning(f"[{self.name}] Failed to extract title: {str(e)}")
+            
+            # Extract description/subtitle
+            description = ""
+            try:
+                desc_selectors = [
+                    ".c-content-head__subtitle",  # Notícias
+                    ".content-head__subtitle",   # Alguns artigos
+                    ".c-news__subtitle"         # Outros formatos
+                ]
+                for selector in desc_selectors:
+                    try:
+                        desc_element = page.locator(selector).first
+                        description = desc_element.inner_text().strip()
+                        if description:
+                            break
+                    except Exception:
+                        continue
+            except Exception:
+                logger.warning(f"[{self.name}] Failed to extract description")
+            
+            # Extract article body
+            body = ""
+            try:
+                body_selectors = [
+                    ".c-news__body",          # Notícias principais
+                    "article",                # Artigos gerais
+                    ".content-text__container" # Outros formatos
+                ]
+                
+                for selector in body_selectors:
+                    try:
+                        body_element = page.locator(selector).first
+                        body = body_element.inner_text().strip()
+                        if body:
+                            break
+                    except Exception:
+                        continue
+                
+                if not body.strip():
+                    logger.warning(f"[{self.name}] Failed to extract article body with any selector")
+            except Exception as e:
+                logger.warning(f"[{self.name}] Failed to extract article body: {str(e)}")
+            
+            # Extract tags
+            tags = []
+            try:
+                tag_selectors = [
+                    ".c-news-tags a",      # Notícias
+                    ".tags-article a",    # Artigos
+                    ".tags a"             # Geral
+                ]
+                
+                for selector in tag_selectors:
+                    try:
+                        tag_elements = page.locator(selector)
+                        for i in range(tag_elements.count()):
+                            tag_text = tag_elements.nth(i).inner_text().strip()
+                            if tag_text and tag_text not in tags:
+                                tags.append(tag_text)
+                        if tags:
+                            break
+                    except Exception:
+                        continue
+            except Exception:
+                logger.warning(f"[{self.name}] Failed to extract tags")
+
+            return EntryItem(
+                title=entry_title,
+                url=self.url,
+                description=description,
+                body=body,
+                tags=tags,
             )
-            most_read_items = self.get_most_read_items(page.locator(".jupiter-most-read-now"))
-
-            entry_screenshot_path = self.take_screenshot(page, self.url, goto=False)
-
-            entry_title = page.locator("h1.title").inner_text()
-            all_items = [ad_items] + most_read_items
-
-        return EntryItem(
-            title=entry_title,
-            ads=all_items,
-            url=self.url,
-            screenshot_path=entry_screenshot_path,
-        )
