@@ -22,4 +22,5 @@ __all__ = [
     VejaPlay,
     UOLPlay,
     GazetaDoPovoPlay,
+    AliadosBrasilPlay,
 ]

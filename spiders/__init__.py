@@ -24,4 +24,5 @@ __all__ = [
     TerraSpider,
     UOLSpider,
     GazetaDoPovoSpider,
+    AliadosBrasilSpider,
 ]
