@@ -9,6 +9,7 @@ from plays.terra import TerraPlay
 from plays.veja import VejaPlay
 from plays.uol import UOLPlay
 from plays.gazetaDoPovo import GazetaDoPovoPlay
+from plays.aliadosBrasil import AliadosBrasilPlay
 
 __all__ = [
     ClicRBSPlay,
