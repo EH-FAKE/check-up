@@ -28,6 +28,32 @@ class UOLSpider(BaseSpider):
     }
 
     def allow_url(self, entry_url):
+        # Verifica se é uma URL do UOL
+        if not any(domain in entry_url for domain in [
+            "noticias.uol.com.br",
+            "esporte.uol.com.br",
+            "economia.uol.com.br",
+            "www.uol.com.br"
+        ]):
+            return False
+
+        # Rejeita URLs de mídia
+        if any(ext in entry_url for ext in [".jpg", ".jpeg", ".png", ".gif", ".mp4", ".mp3"]):
+            return False
+
+        # Rejeita URLs de seções especiais
+        if any(section in entry_url for section in ["/ultimas/", "/ao-vivo/", "/videos/", "/fotos/", "/especiais/"]):
+            return False
+
+        # Rejeita URLs muito curtas (provavelmente são páginas de categoria)
+        if len(entry_url) < 80:
+            return False
+
+        # Verifica se a URL tem um formato típico de notícia
+        # Ex: noticias.uol.com.br/2023/05/27/titulo-da-noticia.htm
+        if not re.search(r'\d{4}/\d{2}/\d{2}', entry_url):
+            return False
+
         return True
 
     def start_requests(self):
