@@ -68,16 +68,69 @@ class UOLPlay(BasePlay):
             # Extract article body
             body = ""
             try:
+                # Primeiro tenta encontrar o container principal do artigo
                 body_selectors = [
                     ".c-news__body",          # Notícias principais
-                    "article",                # Artigos gerais
-                    ".content-text__container" # Outros formatos
+                    ".content-text__container", # Outros formatos
+                    "div[article-body]",      # Novo formato
+                    "div.text",              # Formato alternativo
+                    "article"                 # Fallback
                 ]
                 
                 for selector in body_selectors:
                     try:
-                        body_element = page.locator(selector).first
-                        body = body_element.inner_text().strip()
+                        # Encontra o container principal
+                        container = page.locator(selector).first
+                        if not container:
+                            continue
+
+                        # Lista de elementos para remover
+                        remove_selectors = [
+                            # Cabeçalho
+                            "header", ".header", ".article-header",
+                            "h1", "h2", ".title", ".subtitle",
+                            ".c-content-head__title", ".c-content-head__subtitle",
+                            ".article-title", ".article-subtitle",
+                            ".content-head__subtitle",
+                            
+                            # Elementos de mídia e anúncios
+                            ".media", ".image", ".photo", ".video",
+                            ".advertisement", ".ad", ".banner",
+                            ".mc-side-item", ".mc-related-content",
+                            ".image-content", ".content-ads",
+                            
+                            # Elementos sociais e interativos
+                            ".share", ".social", ".comments",
+                            ".share-bar", ".social-bar",
+                            ".newsletter", ".subscription",
+                            
+                            # Conteúdo relacionado e navegação
+                            ".related", ".read-too", ".see-also",
+                            ".related-articles", ".read-more",
+                            ".navigation", ".pagination",
+                            
+                            # Metadados e tags
+                            ".tags", ".article-tags", ".c-news-tags",
+                            ".metadata", ".author", ".date",
+                            ".timestamp", ".time"
+                        ]
+
+                        # Remove todos os elementos indesejados
+                        for remove_selector in remove_selectors:
+                            try:
+                                elements = container.locator(remove_selector).all()
+                                for el in elements:
+                                    el.evaluate('el => el.remove()')
+                            except Exception:
+                                continue
+
+                        # Pega o texto limpo e remove linhas em branco extras
+                        body = "\n".join(
+                            line.strip()
+                            for line in container.inner_text().split("\n")
+                            if line.strip()
+                        )
+                        
                         if body:
                             break
                     except Exception:
