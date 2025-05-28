@@ -19,6 +19,9 @@ crawl_metropoles:
 crawl_ig:
 	docker compose exec scraper python crawl.py igspider
 
+scrape_ig:
+	docker compose exec scraper python scrape_no_openai.py --platform ig.com.br
+
 init_db:
 	docker compose run scraper python create_db.py
 

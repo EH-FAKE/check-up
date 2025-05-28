@@ -41,7 +41,7 @@ class IGSpider(BaseSpider):
         self.logger.info(f"Visitando: {response.url}")
 
 
-        for entry in response.css("a.img-link"):
+        for entry in response.css("a.title"):
             url = entry.attrib.get("href")
             if url:
                 url = response.urljoin(url)
