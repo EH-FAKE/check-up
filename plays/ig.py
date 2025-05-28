@@ -1,28 +1,15 @@
-import time
 from playwright.sync_api import sync_playwright, TimeoutError
-
 from plays.base import BasePlay
-from plays.items import AdItem, EntryItem
-from plays.utils import get_or_none
+from plays.items import EntryItem
 from plog import logger
 
 
 class IGPlay(BasePlay):
     name = "ig"
-    n_expected_ads = 10
 
     @classmethod
     def match(cls, url: str) -> bool:
         return "ig.com.br" in url
-
-    def find_items(self, html_content: str) -> AdItem:
-        return AdItem(
-            title=get_or_none(r'title="(.*?)"', html_content),
-            url=get_or_none(r'href="(.*?)"', html_content),
-            thumbnail_url=get_or_none(r'url\(&quot;(.*?)&quot;\)', html_content),
-            tag=get_or_none(r'<span class="branding-inner.*?>(.*?)</span>', html_content),
-            excerpt=get_or_none(r'slot="description" title="(.*?)"', html_content),
-        )
 
     def run(self) -> EntryItem:
         with sync_playwright() as p:
@@ -34,31 +21,91 @@ class IGPlay(BasePlay):
                 page.goto(self.url, timeout=180_000)
             except TimeoutError:
                 logger.error(f"[{self.name}] Timeout loading page {self.url}")
-                return EntryItem(title="Timeout", ads=[], url=self.url, screenshot_path="")
+                return EntryItem(title="Timeout", url=self.url)
+            
+            # espera pelo título principal da notícia
+            page.wait_for_selector("h1", timeout=30000)
+            if page.locator("h1"):
+                # extrai o título principal da notícia
+                entry_title = page.locator("//h1").first.inner_text()
+            else:
+                # Espera pelo título específico a partir do id do selector
+                page.wait_for_selector("#noticia-titulo-h1", timeout=30000)
+                if page.locator("#noticia-titulo-h1"):
+                    # extrai titulo pelo id do selector
+                    entry_title = page.locator("#noticia-titulo-h1").first.inner_text()
+            
+            # Subtítulo / descrição
+            description = ""
+            try:
+                description = page.locator("#noticia-olho").inner_text()
+            except Exception:
+                logger.warning(f"[{self.name}] Failed to extract description")
 
-            logger.info(f"[{self.name}] Scrolling to load dynamic content...")
-            self.scroll_down(page, 10, amount=500, wait_time=1)
+            # Corpo da notícia
+            body = ""
+            try:
+                selectors = [
+                    "#conteudoNoticia p",
+                    "#noticiaTexto p",
+                    ".noticia-conteudo p",
+                    "article p",
+                ]
+                for selector in selectors:
+                    try:
+                        logger.info(f"[{self.name}] Trying selector: {selector}")
+                        
+                        # Espera o primeiro parágrafo desse seletor, se possível
+                        page.wait_for_selector(selector, timeout=5000)
 
-            entry_screenshot_path = self.take_screenshot(page, self.url, goto=False)
-            entry_title = page.title()
+                        content_elements = page.locator(selector)
+                        count = content_elements.count()
+                        logger.debug(f"[{self.name}] Found {count} elements for {selector}")
 
-            logger.info(f"[{self.name}] Searching for ad elements...")
-            elements = page.locator(".videoCube")
-            ad_items = []
+                        if count > 0:
+                            paragraphs = []
+                            for i in range(count):
+                                text = content_elements.nth(i).inner_text().strip()
+                                if text:
+                                    paragraphs.append(text)
+                            body = "\n\n".join(paragraphs)
+                            if body.strip():
+                                logger.info(f"[{self.name}] Extracted body with {selector}")
+                                break
+                    except Exception as e:
+                        logger.debug(f"[{self.name}] Selector {selector} failed: {e}")
+                if not body.strip():
+                    logger.warning(f"[{self.name}] Could not extract body content")
+            except Exception as e:
+                logger.warning(f"[{self.name}] Error extracting body: {e}")
 
-            for i in range(elements.count()):
-                element = elements.nth(i)
-                if not element.is_visible():
-                    continue
-                html_content = element.inner_html()
-                ad_item = self.find_items(html_content)
-                ad_items.append(ad_item)
+            # Tags (caso existam)
+            tags = []
+            try:
+                tag_elements = page.locator(".tags a")
+                if tag_elements.count() > 0:
+                    for i in range(tag_elements.count()):
+                        tag_text = tag_elements.nth(i).inner_text().strip()
+                        if tag_text:
+                            tags.append(tag_text)
+                else:
+                    # Fallback: pegar do <meta property="article:tag" content="...">
+                    meta_tag = page.locator('meta[property="article:tag"]')
+                    if meta_tag.count() > 0:
+                        content = meta_tag.first.get_attribute("content")
+                        if content:
+                            tags = [tag.strip() for tag in content.split(",") if tag.strip()]
+            except Exception as e:
+                logger.warning(f"[{self.name}] Failed to extract tags: {e}")
 
-            logger.info(f"[{self.name}] Found {len(ad_items)} ads.")
 
             return EntryItem(
                 title=entry_title,
-                ads=ad_items,
                 url=self.url,
-                screenshot_path=entry_screenshot_path,
+                description=description,
+                body=body,
+                tags=tags,
             )
+
+    def execute(self) -> EntryItem:
+        return self.run()
