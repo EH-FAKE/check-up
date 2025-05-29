@@ -140,7 +140,7 @@ jobs:
           --health-start-period 10s
 
       minio:
-        image: minio/minio:RELEASE.2024-01-16T16-07-38Z
+        image: fclairamb/minio-github-actions
         env:
           MINIO_ROOT_USER: minioadmin
           MINIO_ROOT_PASSWORD: minioadmin
@@ -149,11 +149,10 @@ jobs:
           - 9001:9001
         options: >-
           --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
-          --health-interval 30s
-          --health-timeout 10s
-          --health-retries 3
-          --health-start-period 10s
-          --command "server /data --console-address :9001"
+          --health-interval 60s
+          --health-timeout 20s
+          --health-retries 5
+          --health-start-period 60s
 
     steps:
       - name: 📥 Checkout code
@@ -214,6 +213,20 @@ jobs:
           done'
           
           echo "✅ All services are ready"
+
+      - name: 🪣 Initialize MinIO bucket
+        run: |
+          # Instalar MinIO client (mc)
+          wget -q https://dl.min.io/client/mc/release/linux-amd64/mc
+          chmod +x mc
+          
+          # Configurar MinIO client
+          ./mc alias set myminio http://localhost:9000 minioadmin minioadmin
+          
+          # Criar bucket se não existir
+          ./mc mb myminio/test-bucket --ignore-existing
+          
+          echo "✅ MinIO bucket initialized"
 
       - name: 🔧 Prepare test environment
         run: |

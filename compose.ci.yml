@@ -64,10 +64,10 @@ services:
     
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
+      interval: 30s
+      timeout: 20s
+      retries: 5
+      start_period: 60s
     
     tmpfs:
       - /data:noexec,nosuid,size=256m
