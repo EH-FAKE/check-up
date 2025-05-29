@@ -62,15 +62,8 @@ services:
     
     command: server /data --console-address ":9001"
     
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
-      retries: 5
-      start_period: 60s
-    
-    tmpfs:
-      - /data:noexec,nosuid,size=256m
+    # Removendo health check complexo
+    # MinIO será iniciado com sleep no CI
 
   # =====================================
   # Aplicação para testes
@@ -98,35 +91,11 @@ services:
       - ci-network
     
     depends_on:
-      db:
-        condition: service_healthy
-      minio:
-        condition: service_healthy
+      - db
+      - minio
     
-    healthcheck:
-      test: |
-        python -c "
-        import sys
-        try:
-            from plays.base import BasePlay
-            print('✅ CI Scraper ready')
-            sys.exit(0)
-        except Exception as e:
-            print(f'❌ CI Scraper failed: {e}')
-            sys.exit(1)
-        "
-      interval: 30s
-      timeout: 10s
-      retries: 2
-      start_period: 10s
-
-# Configuração específica para CI
-x-ci-config:
-  restart_policy: &restart_policy
-    condition: "no"
-  
-  logging: &logging
-    driver: "json-file"
-    options:
-      max-size: "10m"
-      max-file: "2" 
+    volumes:
+      - ./:/project/:rw
+      - ./logs:/project/logs:rw
+      - ./screenshots:/project/screenshots:rw
+      - ./sessions:/project/sessions:rw 

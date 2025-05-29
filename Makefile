@@ -196,14 +196,11 @@ ci-act-build:
 	act $(ACT_WITH_TOKEN) --job build
 
 ci-act-test:
-	@echo "🎭 Executando jobs de teste com act..."
-	@command -v act >/dev/null 2>&1 || { echo "❌ Act não instalado. Instale com: brew install act"; exit 1; }
-	act $(ACT_WITH_TOKEN) --job test
-
-ci-act-compose:
-	@echo "🎭 Executando job de compose-test com act..."
-	@command -v act >/dev/null 2>&1 || { echo "❌ Act não instalado. Instale com: brew install act"; exit 1; }
-	act $(ACT_WITH_TOKEN) --job compose-test
+	@echo "=== 🧪 Executando CI - Test com Act ==="
+	@echo ""
+	@echo "🎭 Executando job de test-with-compose com act..."
+	@echo "Isso simulará localmente o job de testes do CI..."
+	act $(ACT_WITH_TOKEN) --job test-with-compose
 
 ci-act-all:
 	@echo "🎭 Executando pipeline completo com act..."
@@ -431,7 +428,6 @@ help:
 	@echo "  make ci-act-lint        - Executa job de lint completo"
 	@echo "  make ci-act-build       - Executa job de build completo"
 	@echo "  make ci-act-test        - Executa jobs de teste completos"
-	@echo "  make ci-act-compose     - Executa job de compose-test"
 	@echo "  make ci-act-all         - Executa pipeline completo"
 	@echo "  make ci-act-list        - Lista jobs disponíveis"
 	@echo "  make ci-act-version     - Verifica versão do act"
