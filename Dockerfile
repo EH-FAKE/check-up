@@ -1,65 +1,156 @@
-# builder
-FROM python:3.12.3 AS builder
+FROM python:3.12.3 AS dependencies
 
-# Instala o pipenv com versão fixa
-RUN pip install --user pipenv==2023.12.1
+LABEL maintainer="Check-up Project"
+LABEL description="Health advertisement analysis scraper"
+LABEL version="1.0"
 
-# Cria o venv dentro do projeto
-ENV PIPENV_VENV_IN_PROJECT=1
+# Configurações de build para otimização
+ARG BUILDPLATFORM
+ARG TARGETPLATFORM
+ARG PIPENV_VERSION=2023.12.1
 
-# Copia apenas os arquivos de dependência primeiro para melhor utilização de cache
-COPY Pipfile Pipfile.lock /usr/src/
-WORKDIR /usr/src
+# Variáveis de ambiente para otimização de build
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIPENV_VENV_IN_PROJECT=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Instala dependências com pipenv
-RUN /root/.local/bin/pipenv sync --dev
+# Instalar pipenv com versão fixa
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --user pipenv==${PIPENV_VERSION}
 
-# Verifica se playwright foi instalado
-RUN /usr/src/.venv/bin/python -c "import playwright; print(playwright)"
+# Criar diretório de trabalho
+WORKDIR /build
 
-# runtime
-FROM python:3.12.3-slim AS runtime
+# Copiar apenas arquivos de dependência para melhor cache
+COPY Pipfile Pipfile.lock ./
 
-# Instala dependências do sistema para o Playwright
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates fonts-liberation libasound2 libatk-bridge2.0-0 libatk1.0-0 libc6 libcairo2 \
-    libcups2 libdbus-1-3 libexpat1 libfontconfig1 libgbm1 libgcc1 libglib2.0-0 libgtk-3-0 libnspr4 \
-    libnss3 libpango-1.0-0 libstdc++6 libx11-6 libx11-xcb1 libxcb1 libxcomposite1 libxcursor1 \
-    libxdamage1 libxext6 libxfixes3 libxi6 libxrandr2 libxrender1 libxss1 libxtst6 wget xdg-utils \
-    curl && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# Instalar dependências Python com cache
+RUN --mount=type=cache,target=/root/.cache/pip \
+    --mount=type=cache,target=/root/.cache/pipenv \
+    /root/.local/bin/pipenv sync --dev
 
-# Copia o ambiente virtual do builder
-COPY --from=builder /usr/src/.venv/ /usr/src/.venv/
+# Verificar instalações críticas
+RUN /build/.venv/bin/python -c "import playwright, sqlalchemy, scrapy; print('✅ Core dependencies installed')"
 
-# Define variáveis de ambiente
-ENV PATH=/usr/src/.venv/bin:$PATH \
+# =====================================
+# System dependencies stage
+# =====================================
+FROM python:3.12.3-slim AS system-deps
+
+# Instalar dependências do sistema com cache apt
+RUN --mount=type=cache,target=/var/cache/apt \
+    --mount=type=cache,target=/var/lib/apt \
+    apt-get update && \
+    apt-get install -y --no-install-recommends \
+        # Essenciais para Playwright
+        ca-certificates \
+        fonts-liberation \
+        libasound2 \
+        libatk-bridge2.0-0 \
+        libatk1.0-0 \
+        libc6 \
+        libcairo2 \
+        libcups2 \
+        libdbus-1-3 \
+        libexpat1 \
+        libfontconfig1 \
+        libgbm1 \
+        libgcc1 \
+        libglib2.0-0 \
+        libgtk-3-0 \
+        libnspr4 \
+        libnss3 \
+        libpango-1.0-0 \
+        libstdc++6 \
+        libx11-6 \
+        libx11-xcb1 \
+        libxcb1 \
+        libxcomposite1 \
+        libxcursor1 \
+        libxdamage1 \
+        libxext6 \
+        libxfixes3 \
+        libxi6 \
+        libxrandr2 \
+        libxrender1 \
+        libxss1 \
+        libxtst6 \
+        # Utilitários
+        wget \
+        xdg-utils \
+        curl \
+        # PostgreSQL client
+        postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# =====================================
+# Playwright browsers stage
+# =====================================
+FROM system-deps AS playwright-setup
+
+# Copiar ambiente virtual da etapa de dependências
+COPY --from=dependencies /build/.venv /app/.venv
+
+# Configurar PATH para usar o venv
+ENV PATH="/app/.venv/bin:$PATH"
+
+# Instalar MinIO client (ferramenta separada)
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install minio==7.2.15
+
+# Instalar browsers do Playwright com cache
+RUN --mount=type=cache,target=/ms-playwright \
+    playwright install --with-deps firefox && \
+    playwright install-deps
+
+# Verificar instalação do Playwright
+RUN python -c "from playwright.sync_api import sync_playwright; p = sync_playwright().start(); print('✅ Playwright ready'); p.stop()"
+
+# =====================================
+# Final runtime stage
+# =====================================
+FROM system-deps AS runtime
+
+# Copiar ambiente virtual completo
+COPY --from=playwright-setup /app/.venv /app/.venv
+
+# Copiar browsers do Playwright
+COPY --from=playwright-setup /ms-playwright /ms-playwright
+
+# Configurar variáveis de ambiente
+ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
-# Instala pacote do minio e playwright antes de copiar o código-fonte
-# para aproveitar melhor o cache de camadas
-RUN pip install minio==7.2.15 && \
-    playwright install --with-deps firefox
-
-# Configuração do diretório de trabalho
+# Configurar diretório de trabalho
 WORKDIR /project
 
-# Cria usuário não-root
-RUN groupadd -r scraper && \
-    useradd --no-log-init -r -g scraper -d /project scraper && \
-    chown -R scraper:scraper /project /usr/src/.venv
+# Criar usuário não-root com UID/GID específicos
+RUN groupadd -g 1001 scraper && \
+    useradd --no-log-init -r -u 1001 -g scraper -d /project scraper && \
+    chown -R scraper:scraper /project /app/.venv /ms-playwright
 
-# Copia o código-fonte para o diretório de trabalho
+# Copiar código-fonte para o diretório de trabalho
 COPY --chown=scraper:scraper . /project
 
-# Muda para o usuário não-root
+# Mudar para usuário não-root
 USER scraper
 
-# Health check para verificar se o container está saudável
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import sys; sys.exit(0)"
+# Criar diretórios necessários
+RUN mkdir -p /project/{screenshots,sessions,logs} && \
+    chmod 755 /project/{screenshots,sessions,logs}
 
-# Comando padrão ao iniciar o container
-CMD ["ipython"]
+# Health check otimizado
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import sys; import playwright; sys.exit(0)" || exit 1
+
+# Adicionar metadata de runtime
+LABEL org.opencontainers.image.created=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
+      org.opencontainers.image.source="https://github.com/EH-FAKE/check-up" \
+      org.opencontainers.image.documentation="https://github.com/EH-FAKE/docs/blob/main/README.md"
+
+# Comando padrão otimizado
+CMD ["ipython", "--no-banner"]
