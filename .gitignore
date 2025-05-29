@@ -6,3 +6,24 @@ collections/
 sessions/
 logs/
 __pycache__
+
+# CI/CD Local
+.actrc
+.act/
+
+# Docker e desenvolvimento
+.docker/
+data/
+screenshots/
+
+# IDE e editores
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporários
+*.tmp
+*.temp
+*.log
+.DS_Store
