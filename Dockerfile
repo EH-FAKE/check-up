@@ -7,7 +7,6 @@ LABEL version="1.0"
 # Configurações de build para otimização
 ARG BUILDPLATFORM
 ARG TARGETPLATFORM
-ARG PIPENV_VERSION=2023.12.1
 
 # Variáveis de ambiente para otimização de build
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -16,9 +15,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Instalar pipenv com versão fixa
+# Instalar pipenv com versão estável
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --user pipenv==${PIPENV_VERSION}
+    pip install --user pipenv
 
 # Criar diretório de trabalho
 WORKDIR /build
@@ -131,7 +130,8 @@ WORKDIR /project
 # Criar usuário não-root com UID/GID específicos
 RUN groupadd -g 1001 scraper && \
     useradd --no-log-init -r -u 1001 -g scraper -d /project scraper && \
-    chown -R scraper:scraper /project /app/.venv /ms-playwright
+    chown -R scraper:scraper /project /app/.venv /ms-playwright && \
+    chmod -R 775 /ms-playwright
 
 # Copiar código-fonte para o diretório de trabalho
 COPY --chown=scraper:scraper . /project
@@ -148,8 +148,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import sys; import playwright; sys.exit(0)" || exit 1
 
 # Adicionar metadata de runtime
-LABEL org.opencontainers.image.created=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
-      org.opencontainers.image.source="https://github.com/EH-FAKE/check-up" \
+LABEL org.opencontainers.image.source="https://github.com/EH-FAKE/check-up" \
       org.opencontainers.image.documentation="https://github.com/EH-FAKE/docs/blob/main/README.md"
 
 # Comando padrão otimizado
