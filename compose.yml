@@ -1,53 +1,295 @@
+# =====================================
+# Check-up Project - Docker Compose
+# =====================================
+version: '3.8'
+
+# Rede personalizada para isolamento e performance
+networks:
+  check-up-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# Volumes para persistência de dados
+volumes:
+  pgdata:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/postgres
+  minio_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ./data/minio
+
 services:
+  # =====================================
+  # PostgreSQL Database
+  # =====================================
+  db:
+    image: postgres:16-alpine
+    container_name: healthcheck_db
+    hostname: healthcheck_db
+    restart: unless-stopped
+    
+    env_file: 
+      - ./docker/.env-postgres
+    
+    environment:
+      # Performance optimizations
+      POSTGRES_INITDB_ARGS: "--data-checksums --encoding=UTF8 --locale=C"
+    
+    ports:
+      - "${DB_PORT:-15433}:5432"
+    
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres-init:/docker-entrypoint-initdb.d:ro
+    
+    networks:
+      - check-up-network
+    
+    command: >
+      postgres
+      -c shared_buffers=256MB
+      -c max_connections=200
+      -c random_page_cost=1.1
+      -c effective_cache_size=1GB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.7
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c log_statement=none
+      -c log_min_duration_statement=1000
+    
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -h localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
+
+  # =====================================
+  # MinIO Object Storage
+  # =====================================
+  minio:
+    image: minio/minio:RELEASE.2024-01-16T16-07-38Z
+    container_name: healthcheck_minio
+    hostname: healthcheck_minio
+    restart: unless-stopped
+    
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_CONSOLE_ADDRESS: ":9001"
+      MINIO_API_CORS_ALLOW_ORIGIN: "*"
+      # Performance settings
+      MINIO_CACHE_DRIVES: "/tmp/cache"
+      MINIO_CACHE_EXCLUDE: "*.tmp"
+    
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    
+    volumes:
+      - minio_data:/data
+      - /tmp/minio-cache:/tmp/cache
+    
+    networks:
+      - check-up-network
+    
+    command: server /data --console-address ":9001"
+    
+    healthcheck:
+      test: |
+        timeout 10s bash -c ':> /dev/tcp/127.0.0.1/9000' || 
+        curl -f http://localhost:9000/minio/health/live || exit 1
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 10s
+    
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  # =====================================
+  # Web Scraper Application
+  # =====================================
   scraper:
-    env_file: .env
     build:
       context: .
+      dockerfile: Dockerfile
+      cache_from:
+        - check-up:latest
+      args:
+        BUILDPLATFORM: linux/amd64
+        TARGETPLATFORM: linux/amd64
+    
     container_name: healthcheck_scraper
+    hostname: healthcheck_scraper
+    restart: unless-stopped
+    
+    env_file: 
+      - .env
+    
+    environment:
+      # Runtime optimizations
+      PYTHONUNBUFFERED: 1
+      PYTHONDONTWRITEBYTECODE: 1
+      # Playwright optimizations
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+      PLAYWRIGHT_DOWNLOAD_HOST: https://playwright.azureedge.net
+      # Performance settings
+      SCRAPER_MAX_WORKERS: 4
+      SCRAPER_TIMEOUT: ${SCRAPER_TIMEOUT:-600}
+    
     volumes:
-      - .:/project/
-      - ./sessions/:/project/sessions/
-      - ./logs/:/var/log/
+      - ./:/project/:cached
+      - ./sessions/:/project/sessions/:rw
+      - ./logs/:/project/logs/:rw
+      - ./screenshots/:/project/screenshots/:rw
+      - /tmp:/tmp:rw
+    
+    networks:
+      - check-up-network
+    
+    ports:
+      - "${SCRAPER_DEBUG_PORT:-8888}:8888"  # Para debug se necessário
+    
     tty: true
+    stdin_open: true
+    
     depends_on:
       db:
         condition: service_healthy
       minio:
         condition: service_healthy
-
-  db:
-    image: postgres:16
-    container_name: healthcheck_db
-    env_file: ./docker/.env-postgres
-    ports:
-      - "15433:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
+    
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
-
-  minio:
-    image: minio/minio
-    container_name: healthcheck_minio
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    volumes:
-      - minio_data:/data
-    command: server /data --console-address ":9001"
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      timeout: 20s
+      test: |
+        python -c "
+        import sys
+        try:
+            from plays.base import BasePlay
+            from sqlalchemy import create_engine
+            from decouple import config
+            
+            # Test database connection
+            engine = create_engine(config('DATABASE_URL'))
+            engine.connect()
+            
+            print('✅ Scraper health check passed')
+            sys.exit(0)
+        except Exception as e:
+            print(f'❌ Scraper health check failed: {e}')
+            sys.exit(1)
+        " || exit 1
+      interval: 60s
+      timeout: 30s
       retries: 3
+      start_period: 30s
+    
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+          cpus: '2.0'
+        reservations:
+          memory: 1G
+          cpus: '1.0'
 
+  # =====================================
+  # Development Tools (opcional)
+  # =====================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: healthcheck_pgadmin
+    hostname: healthcheck_pgadmin
+    restart: unless-stopped
+    
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: 'False'
+    
+    ports:
+      - "${PGADMIN_PORT:-8080}:80"
+    
+    networks:
+      - check-up-network
+    
+    depends_on:
+      db:
+        condition: service_healthy
+    
+    profiles:
+      - dev
+      - development
+    
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+
+  # =====================================
+  # Monitoring (opcional)
+  # =====================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: healthcheck_prometheus
+    hostname: healthcheck_prometheus
+    restart: unless-stopped
+    
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    
+    volumes:
+      - ./docker/prometheus:/etc/prometheus:ro
+      - prometheus_data:/prometheus
+    
+    networks:
+      - check-up-network
+    
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    
+    profiles:
+      - monitoring
+      - production
+    
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+# Volumes adicionais para monitoramento
 volumes:
-  pgdata:
-  minio_data:
+  prometheus_data:
+    driver: local
