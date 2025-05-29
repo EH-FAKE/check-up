@@ -10,6 +10,103 @@ Apesar de funcionar apenas com os dez sites cobertos pelo projeto, este código 
 
 O código deste projeto pode ser usado apenas para fins não-comerciais e com atribuição de crédito.
 
+## 🚀 CI/CD, Build e Desenvolvimento Local
+
+### 📋 Visão Geral do Fluxo de Desenvolvimento
+- **Build Docker otimizado:** O `Dockerfile` foi estruturado para build multi-stage, cache eficiente e instalação automática dos browsers do Playwright. Agora o build funciona de forma confiável em qualquer ambiente.
+- **Makefile completo:** O novo `Makefile` centraliza todos os comandos de setup, build, testes, coleta de dados, pipelines de desenvolvimento e produção, além de targets para CI/CD local e integração com o GitHub Actions.
+- **Workflows CI/CD:** O repositório inclui `.github/workflows/ci.yml` para CI completo (lint, build, testes, compose) e `.github/workflows/local-ci.yml` para rodar checagens rápidas localmente usando [act](https://github.com/nektos/act).
+- **Testes otimizados:** Testes unitários, de scraping, integração e infraestrutura podem ser executados facilmente via Makefile ou workflows.
+- **Ambiente isolado:** Uso de Docker Compose para orquestrar banco, MinIO, scraper e ferramentas auxiliares.
+
+### ⚡ Comandos Rápidos (Makefile)
+```bash
+# Setup completo do ambiente (inclui build, browsers, banco, migrações)
+make setup
+
+# Setup rápido (reaproveita browsers já instalados)
+make setup-fast
+
+# Build da imagem Docker (multi-stage, cache, playwright)
+make build
+
+# Iniciar/Parar serviços
+make start
+make stop
+
+# Limpeza total do ambiente
+make clean
+
+# Executar todos os testes (unitários, scraping, integração)
+make test
+
+# Testes específicos
+make test_rbs
+make test_base
+make test_integration
+make test_scrape-no-openai
+
+# Lint e formatação
+make lint
+make format
+
+# Pipeline de desenvolvimento (lint, testes rápidos, scraping)
+make dev-pipeline
+
+# Pipeline de produção (lint, segurança, build, push)
+make prod-pipeline
+```
+
+### 🧪 Testes Locais e CI
+- **Testes locais rápidos:**
+  - `make test` — executa todos os testes
+  - `make test_fast` — executa apenas testes rápidos
+  - `make test_coverage` — executa testes com relatório de cobertura
+- **CI Local com Act:**
+  - Instale o [act](https://github.com/nektos/act): `brew install act`
+  - Rode o workflow local:
+    ```bash
+    make ci-act-local      # Workflow local rápido (lint, docker, compose)
+    make ci-act-local-lint # Apenas lint local
+    make ci-act-local-docker # Teste rápido de build Docker
+    ```
+  - O workflow local simula `.github/workflows/ci.yml` e garante que o build e os testes funcionarão no CI do GitHub.
+
+### 🐳 Build Docker e Troubleshooting
+- O `Dockerfile` agora está multi-stage, instala browsers do Playwright, e faz healthcheck do ambiente.
+- Para build manual:
+  ```bash
+  docker build -t check-up:latest .
+  ```
+- Para rodar comandos dentro do container:
+  ```bash
+  make bash
+  ```
+- Se precisar reinstalar browsers:
+  ```bash
+  make install-browsers
+  ```
+
+### 🗃️ Banco de Dados e MinIO
+- O ambiente já sobe PostgreSQL e MinIO via Compose.
+- Variáveis `.env` controlam acesso e credenciais.
+- Os resultados de scraping são salvos no banco e no MinIO automaticamente.
+
+### 🕸️ Estrutura de Spiders e Plays
+- Cada portal tem um spider Scrapy (`spiders/`) e um script Playwright (`plays/`).
+- Para adicionar novo portal, siga o modelo dos arquivos existentes e veja exemplos no README.
+- O scraping pode ser executado com ou sem classificação LLM, e agora aceita argumentos de timeout e plataforma via CLI:
+  ```bash
+  make scrape-no-ai TIMEOUT=900 PLATFORM=firefox
+  ```
+
+### 🧑‍💻 Contribuição e Fluxo de Branch/Commit
+- Siga o guia de contribuição (ver [política de branches](https://eh-fake.github.io/docs/guia-de-contribuicao/politica-de-branches/), [guia de commits](https://eh-fake.github.io/docs/guia-de-contribuicao/guia-de-commits/)).
+- Use Conventional Commits e Git Flow para branch/PR.
+- Nunca faça push direto para `main` ou `develop`.
+- Sempre rode os testes e o lint antes de abrir PR.
+
+---
 
 ## Portais de notícias
 Este repositório inicialmente contempla a coleta de notícias dos seguintes portais:
@@ -191,7 +288,7 @@ deve ser desenvolvido de acordo com estrutura de cada portal.
 
 ## Classificação dos anúncios com LLM
 Cada anúncio coletado é classificado em uma das 45 categorias descritas em `llm/categories.py`.
-Esta classificação é opicional, para ativá-la basta adicionar sua chave de API da OpenAI à variável `OPENAI_API_KEY`.
+Esta classificação é opcional, para ativá-la basta adicionar sua chave de API da OpenAI à variável `OPENAI_API_KEY`.
 Para mais informações acesse o site da [OpenAI](https://platform.openai.com/docs/api-reference/api-keys).
 
 ## Armazenamento de arquivos
@@ -226,24 +323,30 @@ Para verificar o banco de dados, você pode executar o seguinte comando:
 
 ## Para nosso caso de uso
 
-copiar env.example para .env e configurar as variáveis de ambiente
+```
+make setup
+```
 
 ```
 make start
 ```
 
 ```
-make init_db
+make crawl_metropoles # ou qualquer outro portal de notícias.
 ```
 
 ```
-make migrate_db
+make scrape_no_openai # ou qualquer outro portal de notícias.
 ```
 
 ```
-make crawl_metropoles
+make stop # para parar os serviços.
 ```
 
 ```
-make scrape_no_openai
+make clean # para limpar os serviços.
+```
+
+```
+make help # para ver todos os comandos disponíveis.
 ```
