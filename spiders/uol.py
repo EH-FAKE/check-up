@@ -1,10 +1,8 @@
-import re
-from urllib.parse import urljoin
-
 import scrapy
 
 from spiders.base import BaseSpider
 from spiders.items import URLItem
+from urllib.parse import urlparse
 
 
 class UOLSpider(BaseSpider):
@@ -27,34 +25,27 @@ class UOLSpider(BaseSpider):
         }
     }
 
-    def allow_url(self, entry_url):
-        # Verifica se é uma URL do UOL
-        if not any(domain in entry_url for domain in [
-            "noticias.uol.com.br",
-            "esporte.uol.com.br",
-            "economia.uol.com.br",
-            "www.uol.com.br"
-        ]):
+    def allow_url(self, url: str) -> bool:
+        p = urlparse(url)
+        path = p.path.rstrip('/')
+
+        # 1) blacklist pure sections
+        if path in {"/videos", "/ao-vivo", "/podcasts", "/fotos", "/especiais"}:
+            self.logger.info(f"Blacklisted URL: {url}")
             return False
 
-        # Rejeita URLs de mídia
-        if any(ext in entry_url for ext in [".jpg", ".jpeg", ".png", ".gif", ".mp4", ".mp3"]):
+        # 2) require at least two non-empty segments (section + slug)
+        segments = [seg for seg in path.split('/') if seg]
+        if len(segments) < 2:
+            self.logger.info(f"Blacklisted URL: {url}")
             return False
 
-        # Rejeita URLs de seções especiais
-        if any(section in entry_url for section in ["/ultimas/", "/ao-vivo/", "/videos/", "/fotos/", "/especiais/"]):
-            return False
+        slug = segments[-1]
+        # 3a) long slugs by hyphens or 3b) by character length
+        if slug.count('-') >= 3 or len(slug) > 30:
+            return True
 
-        # Rejeita URLs muito curtas (provavelmente são páginas de categoria)
-        if len(entry_url) < 80:
-            return False
-
-        # Verifica se a URL tem um formato típico de notícia
-        # Ex: noticias.uol.com.br/2023/05/27/titulo-da-noticia.htm
-        if not re.search(r'\d{4}/\d{2}/\d{2}', entry_url):
-            return False
-
-        return True
+        return False
 
     def start_requests(self):
         for url in self.start_urls:
@@ -66,20 +57,18 @@ class UOLSpider(BaseSpider):
             )
 
     def parse(self, response):
-        url_item = URLItem()
-        for entry in response.css("a"):
-            url = entry.attrib.get("href")
-            if not url or url.startswith('#'):
+        # grab every <a> in *any* div
+        links = response.css('a')
+        self.logger.info(f"Found {len(links)} links")
+
+        for link in links:
+            raw = link.attrib.get("href")
+            if not raw:
                 continue
-                
-            # Converte URLs relativas em absolutas
-            absolute_url = urljoin(response.url, url)
-            
-            if self.allow_url(absolute_url):
-                url_item["url"] = absolute_url
-                yield url_item
-                yield scrapy.Request(
-                    url=absolute_url,
-                    callback=self.parse,
-                    meta={"dont_redirect": True, "handle_httpstatus_list": [403]},
-                )
+
+            # build an absolute URL, then strip fragments/queries
+            full = response.urljoin(raw)
+            full = full.split('#', 1)[0].split('?', 1)[0]
+
+            if self.allow_url(full):
+                yield URLItem(url=full)
