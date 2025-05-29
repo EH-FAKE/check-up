@@ -13,8 +13,8 @@ scrape_no_openai:
 crawl:
 	docker compose run scraper python crawl.py
 
-crawl_metropoles:
-	docker compose run scraper python crawl.py metropolesspider
+crawl_terra:
+	docker compose run scraper python crawl.py terraspider
 
 init_db:
 	docker compose run scraper python create_db.py

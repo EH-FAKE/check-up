@@ -32,7 +32,7 @@ parser.add_argument(
 args = parser.parse_args()
 
 # Environment fallback
-ENV_PORTAL = config("SCRAPER_PLATFORM", default="metropoles.com")
+ENV_PORTAL = config("SCRAPER_PLATFORM", default="terra.com.br")
 # CLI flag takes precedence
 TARGET_DOMAIN = args.platform or ENV_PORTAL
 # Prepare folder name for MinIO (replace dots with underscores)
