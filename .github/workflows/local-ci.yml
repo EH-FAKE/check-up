@@ -1,0 +1,85 @@
+name: Local CI (Act)
+
+on:
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: '3.12'
+
+jobs:
+  local-lint:
+    name: 🔍 Quick Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: 📦 Install basic dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flake8
+
+      - name: 🔍 Quick lint check
+        run: |
+          # Verificar apenas erros críticos
+          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --max-line-length=150
+
+  local-docker:
+    name: 🐳 Quick Docker Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: 🐳 Build Docker image (dependencies only)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          target: dependencies
+          tags: check-up:dependencies
+          load: true
+
+      - name: 🧪 Test basic imports
+        run: |
+          docker run --rm check-up:dependencies /build/.venv/bin/python -c "
+          import sys
+          try:
+              import playwright, sqlalchemy, scrapy
+              print('✅ Core dependencies working')
+              sys.exit(0)
+          except ImportError as e:
+              print(f'❌ Import error: {e}')
+              sys.exit(1)
+          "
+
+  local-compose:
+    name: 🐙 Quick Compose Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Create minimal .env
+        run: |
+          cat > .env << 'EOF'
+          HEADLESS=true
+          DATABASE_URL=postgresql://postgres:test@localhost:5432/test_db
+          MINIO_ENDPOINT=localhost:9000
+          MINIO_ACCESS_KEY=minioadmin
+          MINIO_SECRET_KEY=minioadmin
+          MINIO_SECURE=false
+          EOF
+
+      - name: 🧪 Validate Docker Compose
+        run: |
+          docker compose config --quiet
+          echo "✅ Docker Compose configuration is valid" 
