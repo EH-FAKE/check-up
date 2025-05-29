@@ -30,6 +30,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     --mount=type=cache,target=/root/.cache/pipenv \
     /root/.local/bin/pipenv sync --dev
 
+# Instalar minio explicitamente (caso não tenha sido incluído no sync)
+RUN /build/.venv/bin/pip install minio==7.2.15
+
 # Verificar instalações críticas
 RUN /build/.venv/bin/python -c "import playwright, sqlalchemy, scrapy; print('✅ Core dependencies installed')"
 
@@ -89,37 +92,49 @@ RUN --mount=type=cache,target=/var/cache/apt \
 # =====================================
 FROM system-deps AS playwright-setup
 
-# Copiar ambiente virtual da etapa de dependências
-COPY --from=dependencies /build/.venv /app/.venv
-
-# Configurar PATH para usar o venv ANTES de qualquer comando
-ENV PATH="/app/.venv/bin:$PATH"
-
-# Instalar MinIO client usando o venv correto
+# Instalar pipenv na etapa system-deps
 RUN --mount=type=cache,target=/root/.cache/pip \
-    /app/.venv/bin/pip install minio==7.2.15
+    pip install --user pipenv
 
-# Instalar browsers do Playwright com cache usando o caminho correto
-RUN --mount=type=cache,target=/ms-playwright \
-    /app/.venv/bin/playwright install --with-deps firefox && \
-    /app/.venv/bin/playwright install-deps
+# Criar diretório de trabalho
+WORKDIR /build
 
-# Verificar instalação do Playwright usando PATH configurado
-RUN /app/.venv/bin/python -c "from playwright.sync_api import sync_playwright; p = sync_playwright().start(); print('✅ Playwright ready'); p.stop()"
+# Copiar arquivos de dependência
+COPY Pipfile Pipfile.lock ./
+
+# Copiar ambiente virtual da etapa de dependências
+COPY --from=dependencies /build/.venv /build/.venv
+
+# Configurar PATH para usar o venv
+ENV PATH="/build/.venv/bin:$PATH"
+
+# Garantir que todas as dependências estejam instaladas
+RUN --mount=type=cache,target=/root/.cache/pip \
+    --mount=type=cache,target=/root/.cache/pipenv \
+    /root/.local/bin/pipenv sync --dev
+
+# Instalar browsers do Playwright com cache
+RUN --mount=type=cache,target=/ms-playwright-cache \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
+    /build/.venv/bin/playwright install --with-deps firefox && \
+    /build/.venv/bin/playwright install-deps
+
+# Verificar instalação do Playwright
+RUN /build/.venv/bin/python -c "from playwright.sync_api import sync_playwright; p = sync_playwright().start(); print('✅ Playwright ready'); p.stop()"
 
 # =====================================
 # Final runtime stage
 # =====================================
 FROM system-deps AS runtime
 
-# Copiar ambiente virtual completo
-COPY --from=playwright-setup /app/.venv /app/.venv
+# Copiar ambiente virtual completo mantendo o mesmo caminho
+COPY --from=playwright-setup /build/.venv /build/.venv
 
 # Copiar browsers do Playwright
 COPY --from=playwright-setup /ms-playwright /ms-playwright
 
 # Configurar variáveis de ambiente
-ENV PATH="/app/.venv/bin:$PATH" \
+ENV PATH="/build/.venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
@@ -130,7 +145,7 @@ WORKDIR /project
 # Criar usuário não-root com UID/GID específicos
 RUN groupadd -g 1001 scraper && \
     useradd --no-log-init -r -u 1001 -g scraper -d /project scraper && \
-    chown -R scraper:scraper /project /app/.venv /ms-playwright && \
+    chown -R scraper:scraper /project /build/.venv /ms-playwright && \
     chmod -R 775 /ms-playwright
 
 # Copiar código-fonte para o diretório de trabalho
