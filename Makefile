@@ -59,6 +59,7 @@ data-dirs:
 # Instalação dos browsers do Playwright
 install-browsers:
 	@echo "📦 Instalando browsers do Playwright..."
+	@echo "⚠️  Normalmente não é necessário - browsers são instalados durante o build"
 	$(SCRAPER_EXEC) playwright install firefox
 	@echo "✅ Browsers instalados com sucesso!"
 
@@ -68,7 +69,7 @@ check-browsers:
 	@$(SCRAPER_EXEC) python -c "from playwright.sync_api import sync_playwright; p = sync_playwright().start(); print('✅ Playwright configurado corretamente'); p.stop()" 2>/dev/null || \
 	(echo "❌ Browsers não instalados. Execute 'make install-browsers'" && exit 1)
 
-setup: env data-dirs start wait-for-db install-browsers init_db migrate_db
+setup: env data-dirs start wait-for-db check-browsers init_db migrate_db
 	@echo "✅ Ambiente configurado com sucesso!"
 
 # Setup rápido (sem reinstalar browsers se já existirem)
