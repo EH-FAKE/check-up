@@ -92,20 +92,20 @@ FROM system-deps AS playwright-setup
 # Copiar ambiente virtual da etapa de dependências
 COPY --from=dependencies /build/.venv /app/.venv
 
-# Configurar PATH para usar o venv
+# Configurar PATH para usar o venv ANTES de qualquer comando
 ENV PATH="/app/.venv/bin:$PATH"
 
-# Instalar MinIO client (ferramenta separada)
+# Instalar MinIO client usando o venv correto
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install minio==7.2.15
+    /app/.venv/bin/pip install minio==7.2.15
 
-# Instalar browsers do Playwright com cache
+# Instalar browsers do Playwright com cache usando o caminho correto
 RUN --mount=type=cache,target=/ms-playwright \
-    playwright install --with-deps firefox && \
-    playwright install-deps
+    /app/.venv/bin/playwright install --with-deps firefox && \
+    /app/.venv/bin/playwright install-deps
 
-# Verificar instalação do Playwright
-RUN python -c "from playwright.sync_api import sync_playwright; p = sync_playwright().start(); print('✅ Playwright ready'); p.stop()"
+# Verificar instalação do Playwright usando PATH configurado
+RUN /app/.venv/bin/python -c "from playwright.sync_api import sync_playwright; p = sync_playwright().start(); print('✅ Playwright ready'); p.stop()"
 
 # =====================================
 # Final runtime stage
