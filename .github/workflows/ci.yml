@@ -153,6 +153,7 @@ jobs:
           --health-timeout 10s
           --health-retries 3
           --health-start-period 10s
+          --command "server /data --console-address :9001"
 
     steps:
       - name: 📥 Checkout code
@@ -181,7 +182,11 @@ jobs:
       - name: 🐳 Load Docker image
         run: |
           docker load < check-up-image.tar.gz
-          docker images
+
+      - name: 📂 Create data directories for Docker Compose
+        run: |
+          mkdir -p data/postgres data/minio
+          chmod -R 777 data
 
       - name: 📦 Install test dependencies
         run: |
@@ -195,11 +200,18 @@ jobs:
 
       - name: ⚡ Wait for services
         run: |
-          # Aguardar PostgreSQL
-          timeout 60s bash -c 'until pg_isready -h localhost -p 5432 -U postgres; do sleep 2; done'
+          echo "🔄 Waiting for PostgreSQL..."
+          timeout 60s bash -c 'until pg_isready -h localhost -p 5432 -U postgres 2>/dev/null; do 
+            echo "PostgreSQL not ready yet, waiting..."; 
+            sleep 2; 
+          done'
+          echo "✅ PostgreSQL is ready"
           
-          # Aguardar MinIO
-          timeout 60s bash -c 'until curl -f http://localhost:9000/minio/health/live 2>/dev/null; do sleep 2; done'
+          echo "🔄 Waiting for MinIO..."
+          timeout 90s bash -c 'until curl -s -f http://localhost:9000/minio/health/live >/dev/null 2>&1; do 
+            echo "MinIO not ready yet, waiting..."; 
+            sleep 3; 
+          done'
           
           echo "✅ All services are ready"
 
@@ -253,6 +265,32 @@ jobs:
           pytest tests/test_integration_improvements.py -v --tb=short --strict-markers --disable-warnings
           echo "✅ Integration tests completed"
 
+      - name: 🐞 Debug service issues
+        if: failure()
+        run: |
+          echo "🔍 Debugging service issues..."
+          
+          echo "=== Docker container status ==="
+          docker ps -a
+          
+          echo "=== Service logs ==="
+          docker logs $(docker ps -a -q --filter "name=postgres")
+          docker logs $(docker ps -a -q --filter "name=minio")
+          
+          echo "=== Network status ==="
+          docker network ls
+          docker network inspect $(docker network ls -q --filter "name=github") || true
+          
+          echo "=== Check port availability ==="
+          nc -zv localhost 5432 || echo "PostgreSQL port not accessible"
+          nc -zv localhost 9000 || echo "MinIO port not accessible"
+          
+          echo "=== System status ==="
+          df -h
+          free -h || true
+          
+          echo "Debug information collected."
+
       - name: 📊 Generate test report
         if: always()
         run: |
@@ -276,6 +314,11 @@ jobs:
       - name: 🐳 Load Docker image
         run: |
           docker load < check-up-image.tar.gz
+
+      - name: 📂 Create data directories for Docker Compose
+        run: |
+          mkdir -p data/postgres data/minio
+          chmod -R 777 data
 
       - name: 🔧 Prepare Docker Compose environment
         run: |
@@ -301,19 +344,39 @@ jobs:
 
       - name: 🚀 Start services with Docker Compose
         run: |
-          docker compose up -d --wait
+          docker compose -f compose.ci.yml up -d --wait
           echo "✅ All services started successfully"
 
       - name: 🔍 Verify services health
         run: |
           # Verificar PostgreSQL
-          docker compose exec -T db pg_isready -U postgres
+          docker compose -f compose.ci.yml exec -T db pg_isready -U postgres
           
           # Verificar MinIO
-          timeout 30s bash -c 'until docker compose exec -T minio curl -f http://localhost:9000/minio/health/live; do sleep 2; done'
+          timeout 30s bash -c 'until docker compose -f compose.ci.yml exec -T minio curl -f http://localhost:9000/minio/health/live; do sleep 2; done'
+          
+          # Inicializar MinIO bucket usando python
+          docker compose -f compose.ci.yml run --rm scraper python -c "
+          from minio import Minio
+          from decouple import config
+          
+          client = Minio(
+              config('MINIO_ENDPOINT'),
+              access_key=config('MINIO_ACCESS_KEY'),
+              secret_key=config('MINIO_SECRET_KEY'),
+              secure=config('MINIO_SECURE', cast=bool)
+          )
+          
+          bucket_name = config('MINIO_BUCKET')
+          if not client.bucket_exists(bucket_name):
+              client.make_bucket(bucket_name)
+              print(f'✅ Bucket {bucket_name} created')
+          else:
+              print(f'ℹ️ Bucket {bucket_name} already exists')
+          "
           
           # Verificar se o scraper pode conectar aos serviços
-          docker compose run --rm scraper python -c "
+          docker compose -f compose.ci.yml run --rm scraper python -c "
           from sqlalchemy import create_engine
           from decouple import config
           
@@ -336,15 +399,37 @@ jobs:
 
       - name: 🧪 Run basic scraper test
         run: |
-          docker compose run --rm scraper python -c "
+          docker compose -f compose.ci.yml run --rm scraper python -c "
           from plays.base import BasePlay
           print('✅ BasePlay import successful')
           "
 
+      - name: 🐞 Debug compose issues
+        if: failure()
+        run: |
+          echo "🔍 Debugging Docker Compose issues..."
+          
+          echo "=== Docker container status ==="
+          docker ps -a
+          
+          echo "=== Service logs ==="
+          docker compose -f compose.ci.yml logs
+          
+          echo "=== Volume info ==="
+          docker volume ls
+          
+          echo "=== Directory structure ==="
+          find data -type d | sort
+          
+          echo "=== Free space ==="
+          df -h
+          
+          echo "Debug information collected."
+
       - name: 🧹 Cleanup
         if: always()
         run: |
-          docker compose down -v --remove-orphans
+          docker compose -f compose.ci.yml down -v --remove-orphans
           docker system prune -f
 
   security:
