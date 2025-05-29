@@ -2,6 +2,7 @@ import os
 import sched
 import time
 import traceback
+import argparse
 
 from decouple import config
 from sqlalchemy import create_engine
@@ -17,6 +18,22 @@ from models import (
     URLQueue,
     create_instance,
 )
+
+# ── Parse CLI arguments ──────────────────────────────────────────────────
+parser = argparse.ArgumentParser(
+    description="Run scraper with OpenAI classification"
+)
+parser.add_argument(
+    "--timeout", "-t",
+    type=int,
+    help="Timeout in seconds for scraper operations (default: from .env or 600)",
+    default=None
+)
+args = parser.parse_args()
+
+ENV_TIMEOUT = config("SCRAPER_TIMEOUT", default=600, cast=int)
+SCRAPER_TIMEOUT = args.timeout or ENV_TIMEOUT
+# ────────────────────────────────────────────────────────────────────────
 
 scheduler = sched.scheduler(time.time, time.sleep)
 
@@ -36,6 +53,8 @@ def run():
 
 
 def main():
+    logger.info(f"Starting scraper with timeout: {SCRAPER_TIMEOUT} seconds")
+    
     engine = create_engine(config("DATABASE_URL"))
     session = Session(engine)
 
@@ -51,7 +70,11 @@ def main():
     url = url_obj.url
     entry_item = None
     try:
-        scraper = BasePlay.get_scraper(url, headless=config("HEADLESS", cast=bool))
+        scraper = BasePlay.get_scraper(
+            url, 
+            headless=config("HEADLESS", cast=bool),
+            timeout_seconds=SCRAPER_TIMEOUT
+        )
         entry_item = scraper.execute()
     except Exception as exc:
         logger.error(f"Error scraping '{url}': {exc!r}")
