@@ -29,12 +29,22 @@ parser.add_argument(
     help="Domain (or slug) of the portal to scrape, e.g. metropoles.com",
     default=None
 )
+parser.add_argument(
+    "--timeout", "-t",
+    type=int,
+    help="Timeout in seconds for scraper operations (default: from .env or 600)",
+    default=None
+)
 args = parser.parse_args()
 
 # Environment fallback
 ENV_PORTAL = config("SCRAPER_PLATFORM", default="metropoles.com")
-# CLI flag takes precedence
+ENV_TIMEOUT = config("SCRAPER_TIMEOUT", default=600, cast=int)
+
+# CLI flags take precedence
 TARGET_DOMAIN = args.platform or ENV_PORTAL
+SCRAPER_TIMEOUT = args.timeout or ENV_TIMEOUT
+
 # Prepare folder name for MinIO (replace dots with underscores)
 PORTAL_FOLDER = TARGET_DOMAIN.replace('.', '_')
 # ────────────────────────────────────────────────────────────────────────
@@ -101,6 +111,8 @@ def run():
 
 
 def main():
+    logger.info(f"Starting scraper with timeout: {SCRAPER_TIMEOUT} seconds")
+    
     # Setup clients
     minio_client = get_minio_client()
     bucket_name = config("MINIO_BUCKET", default="scraped-articles")
@@ -131,7 +143,11 @@ def main():
         url_obj.set_as_started(session)
 
         try:
-            scraper = BasePlay.get_scraper(url_obj.url, headless=config("HEADLESS", cast=bool))
+            scraper = BasePlay.get_scraper(
+                url_obj.url, 
+                headless=config("HEADLESS", cast=bool),
+                timeout_seconds=SCRAPER_TIMEOUT
+            )
             entry_item = scraper.execute()
         except Exception as exc:
             logger.error(f"Error scraping '{url_obj.url}': {exc!r}")
