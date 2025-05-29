@@ -144,8 +144,8 @@ jobs:
           # Criar arquivo .env para Docker Compose
           cat > .env << 'EOF'
           HEADLESS=true
-          DATABASE_URL=postgresql://postgres:postgres@ci_db:5432/test_healthcheck
-          MINIO_ENDPOINT=ci_minio:9000
+          DATABASE_URL=postgresql://postgres:postgres@db:5432/test_healthcheck
+          MINIO_ENDPOINT=minio:9000
           MINIO_ACCESS_KEY=minioadmin
           MINIO_SECRET_KEY=minioadmin
           MINIO_SECURE=false
@@ -169,20 +169,45 @@ jobs:
             sleep 2; 
           done'
           
-          # Aguardar MinIO - simplificado sem health check complexo
-          echo "Waiting 30s for MinIO to start..."
-          sleep 30
+          # Aguardar MinIO com verificação mais robusta
+          echo "⏳ Waiting for MinIO to be ready..."
+          timeout 60s bash -c 'until curl -s -f http://localhost:9000/minio/health/live >/dev/null 2>&1; do 
+            echo "Waiting for MinIO..."; 
+            sleep 3; 
+          done' || {
+            echo "⚠️ MinIO health check timeout, verificando containers..."
+            docker compose -f compose.ci.yml ps
+            docker compose -f compose.ci.yml logs minio --tail=20
+          }
           
           echo "✅ Services are ready"
 
+      - name: 🔍 Debug service connectivity
+        run: |
+          echo "=== Verificando status dos serviços ==="
+          docker compose -f compose.ci.yml ps
+          
+          echo -e "\n=== Testando conectividade PostgreSQL ==="
+          docker compose -f compose.ci.yml exec -T db pg_isready -U postgres && echo "✅ PostgreSQL OK"
+          
+          echo -e "\n=== Testando conectividade MinIO ==="
+          curl -s -f http://localhost:9000/minio/health/live && echo "✅ MinIO health OK" || echo "❌ MinIO health FAIL"
+          
+          echo -e "\n=== Inspecionando rede Docker ==="
+          docker network ls | grep ci-network || echo "Rede padrão do compose sendo usada"
+
       - name: 🗄️ Initialize database and MinIO
         run: |
+          # Verificar conectividade entre containers
+          echo "🔍 Verificando conectividade..."
+          docker compose -f compose.ci.yml exec -T db ping -c 1 minio || echo "⚠️ Não foi possível pingar MinIO do container db"
+          
           # Inicializar banco de dados
           docker compose -f compose.ci.yml run --rm scraper python -c "
           from sqlalchemy import create_engine
           from models import Portal, Entry, Advertisement, URLQueue, QueueStatus
           
-          DATABASE_URL = 'postgresql://postgres:postgres@ci_db:5432/test_healthcheck'
+          DATABASE_URL = 'postgresql://postgres:postgres@db:5432/test_healthcheck'
           engine = create_engine(DATABASE_URL)
           
           print('📋 Creating database tables...')
@@ -194,23 +219,62 @@ jobs:
           print('✅ Database tables created successfully!')
           "
           
-          # Criar bucket MinIO
+          # Criar bucket MinIO com tratamento de erro
           docker compose -f compose.ci.yml run --rm scraper python -c "
           from minio import Minio
+          from minio.error import S3Error
+          import socket
+          import time
           
-          client = Minio(
-              'ci_minio:9000',
-              access_key='minioadmin',
-              secret_key='minioadmin',
-              secure=False
-          )
+          # Tentar resolver o hostname primeiro
+          try:
+              minio_host = 'minio'
+              minio_port = 9000
+              print(f'🔍 Tentando resolver {minio_host}...')
+              ip = socket.gethostbyname(minio_host)
+              print(f'✅ MinIO resolvido para IP: {ip}')
+          except socket.gaierror as e:
+              print(f'❌ Erro ao resolver hostname: {e}')
+              print('🔄 Tentando usar localhost...')
+              minio_host = 'localhost'
           
-          bucket_name = 'test-bucket'
-          if not client.bucket_exists(bucket_name):
-              client.make_bucket(bucket_name)
-              print(f'✅ Bucket {bucket_name} created')
-          else:
-              print(f'ℹ️ Bucket {bucket_name} already exists')
+          # Tentar conectar ao MinIO com retry
+          max_retries = 3
+          retry_delay = 5
+          
+          for attempt in range(max_retries):
+              try:
+                  print(f'🔄 Tentativa {attempt + 1}/{max_retries} de conectar ao MinIO em {minio_host}:{minio_port}')
+                  
+                  client = Minio(
+                      f'{minio_host}:{minio_port}',
+                      access_key='minioadmin',
+                      secret_key='minioadmin',
+                      secure=False
+                  )
+                  
+                  # Testar conexão listando buckets
+                  buckets = client.list_buckets()
+                  print(f'✅ Conectado ao MinIO! Buckets existentes: {[b.name for b in buckets]}')
+                  
+                  # Criar bucket se não existir
+                  bucket_name = 'test-bucket'
+                  if not client.bucket_exists(bucket_name):
+                      client.make_bucket(bucket_name)
+                      print(f'✅ Bucket {bucket_name} criado com sucesso!')
+                  else:
+                      print(f'ℹ️ Bucket {bucket_name} já existe')
+                  
+                  break
+                  
+              except Exception as e:
+                  print(f'❌ Erro na tentativa {attempt + 1}: {type(e).__name__}: {e}')
+                  if attempt < max_retries - 1:
+                      print(f'⏳ Aguardando {retry_delay}s antes da próxima tentativa...')
+                      time.sleep(retry_delay)
+                  else:
+                      print('❌ Falha ao conectar ao MinIO após todas as tentativas')
+                      raise
           "
 
       - name: 🧪 Run all tests
