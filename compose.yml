@@ -1,7 +1,6 @@
 # =====================================
 # Check-up Project - Docker Compose
 # =====================================
-version: '3.8'
 
 # Rede personalizada para isolamento e performance
 networks:
@@ -25,6 +24,8 @@ volumes:
       type: none
       o: bind
       device: ./data/minio
+  prometheus_data:
+    driver: local
 
 services:
   # =====================================
@@ -288,8 +289,3 @@ services:
         limits:
           memory: 512M
           cpus: '0.5'
-
-# Volumes adicionais para monitoramento
-volumes:
-  prometheus_data:
-    driver: local
