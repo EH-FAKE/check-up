@@ -29,23 +29,42 @@ class UOLSpider(BaseSpider):
         p = urlparse(url)
         path = p.path.rstrip('/')
 
-        # 1) blacklist pure sections
-        if path in {"/videos", "/ao-vivo", "/podcasts", "/fotos", "/especiais"}:
-            self.logger.info(f"Blacklisted URL: {url}")
-            return False
-
-        # 2) require at least two non-empty segments (section + slug)
+        # Get non-empty path segments
         segments = [seg for seg in path.split('/') if seg]
         if len(segments) < 2:
-            self.logger.info(f"Blacklisted URL: {url}")
+            self.logger.info(f"URL com menos de 2 segmentos: {url}")
             return False
 
-        slug = segments[-1]
-        # 3a) long slugs by hyphens or 3b) by character length
-        if slug.count('-') >= 3 or len(slug) > 30:
-            return True
+        # Whitelist de seções conhecidas que contêm notícias
+        news_sections = {
+            'noticias',
+            'economia/noticias',
+            'esporte/noticias',
+            'esporte/futebol',
+            'carros/noticias',
+            'economia/agronegocio',
+            'economia/mercados',
+            'economia/empregos',
+            'politica',
+            'mundo',
+            'tecnologia/noticias',
+            'economia/folha',
+            'esporte/folha'
+        }
 
-        return False
+        # Verifica se o início do path está na whitelist
+        path_start = '/'.join(segments[:2])
+        if path_start not in news_sections:
+            self.logger.info(f"Seção não está na whitelist: {url}")
+            return False
+
+        # Verifica se o último segmento (slug) tem características de notícia
+        slug = segments[-1]
+        if not (slug.count('-') >= 3 and len(slug) > 20):
+            self.logger.info(f"Slug não tem padrão de notícia: {url}")
+            return False
+
+        return True
 
     def start_requests(self):
         for url in self.start_urls:
