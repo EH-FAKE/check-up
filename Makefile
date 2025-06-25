@@ -338,6 +338,24 @@ scrape-rbs: check-browsers
 	$(SCRAPER_RUN) scrape_no_openai.py --platform clicrbs.com.br
 
 # =========================================================================
+# Análise de Dados JSON
+# =========================================================================
+# Demonstração das funcionalidades de leitura de JSON
+demo-json:
+	@echo "🎯 Executando demonstração do DataReader..."
+	$(SCRAPER_RUN) examples/json_reader_demo.py
+
+# Teste do DataReader
+test-json:
+	@echo "🧪 Testando funcionalidades do DataReader..."
+	$(DOCKER_COMPOSE) run --rm scraper python -m pytest tests/test_data_reader.py -v
+
+# Teste simples de leitura de JSON
+test-read-json:
+	@echo "📖 Testando leitura básica de JSON..."
+	$(SCRAPER_RUN) -c "from data_reader import read_json_file; print('✅ Função read_json_file disponível')"
+
+# =========================================================================
 # Workflows Completos
 # =========================================================================
 collect-metropoles: crawl-metropoles scrape-no-ai
@@ -437,6 +455,11 @@ help:
 	@echo "  make crawl SPIDER=nome  - Coleta URLs (spider específico)"
 	@echo "  make scrape             - Coleta anúncios (com IA)"
 	@echo "  make scrape-no-ai       - Coleta anúncios (sem IA)"
+	@echo ""
+	@echo "📈 Análise de Dados JSON:"
+	@echo "  make demo-json          - Demonstração do DataReader"
+	@echo "  make test-json          - Testa funcionalidades de leitura JSON"
+	@echo "  make test-read-json     - Teste simples da função de leitura"
 	@echo ""
 	@echo "📈 Monitoramento:"
 	@echo "  make logs               - Visualiza logs dos serviços"
