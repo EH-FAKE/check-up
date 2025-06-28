@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import List
 from minio import Minio
 from dotenv import load_dotenv
+from datetime import datetime
 
 app = FastAPI()
 
@@ -56,7 +57,10 @@ def listar_portais():
     return sorted(list(portais))
 
 @app.get("/noticias/{portal}")
-def listar_noticias(portal: str):
+def listar_noticias(
+    portal: str,
+    order: str = Query("desc", regex="^(asc|desc)$")
+):
     prefix = f"{portal}/"
     noticias = []
     try:
@@ -67,15 +71,38 @@ def listar_noticias(portal: str):
                     response = minio_client.get_object(MINIO_BUCKET, obj.object_name)
                     conteudo = response.read()
                     noticia = json.loads(conteudo.decode('utf-8'))
+                    # Padronizar campo de data
+                    data_str = noticia.get('date') or noticia.get('publishedAt') or noticia.get('createdAt')
+                    if data_str:
+                        try:
+                            data = datetime.fromisoformat(data_str[:10])
+                            noticia['_data'] = data
+                        except Exception:
+                            noticia['_data'] = datetime.min
+                    else:
+                        noticia['_data'] = datetime.min
                     noticias.append(noticia)
                 except Exception:
-                    continue  # Ignora arquivos com erro
+                    continue
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao acessar o MinIO: {str(e)}")
+
+    # Ordenação
+    reverse = order == 'desc'
+    noticias.sort(key=lambda n: n['_data'], reverse=reverse)
+
+    # Remover campo auxiliar
+    for n in noticias:
+        n.pop('_data', None)
+
     return noticias
 
 @app.get("/noticias/{portal}/search")
-def buscar_noticias(portal: str, q: str = Query(..., description="Termo de busca")):
+def buscar_noticias(
+    portal: str,
+    q: str = Query(..., description="Termo de busca"),
+    order: str = Query("desc", regex="^(asc|desc)$")
+):
     termo = q.strip().lower()
     prefix = f"{portal}/"
     resultados = []
@@ -95,9 +122,28 @@ def buscar_noticias(portal: str, q: str = Query(..., description="Termo de busca
                         ' '.join(noticia.get('tags', []) or [])
                     ]
                     if any(termo in campo.lower() for campo in campos):
+                        # Padronizar campo de data
+                        data_str = noticia.get('date') or noticia.get('publishedAt') or noticia.get('createdAt')
+                        if data_str:
+                            try:
+                                data = datetime.fromisoformat(data_str[:10])
+                                noticia['_data'] = data
+                            except Exception:
+                                noticia['_data'] = datetime.min
+                        else:
+                            noticia['_data'] = datetime.min
                         resultados.append(noticia)
                 except Exception:
                     continue
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao acessar o MinIO: {str(e)}")
+
+    # Ordenação
+    reverse = order == 'desc'
+    resultados.sort(key=lambda n: n['_data'], reverse=reverse)
+
+    # Remover campo auxiliar
+    for n in resultados:
+        n.pop('_data', None)
+
     return resultados 
