@@ -153,6 +153,9 @@ wait-for-db:
 	@$(DOCKER_COMPOSE) exec db sh -c 'until pg_isready -U postgres -h localhost; do sleep 1; done'
 	@echo "✅ PostgreSQL pronto!"
 
+crawl_maisgoias:
+	docker compose run scraper python crawl.py maisgoiasspider
+
 init_db:
 	$(SCRAPER_RUN) create_db.py
 
