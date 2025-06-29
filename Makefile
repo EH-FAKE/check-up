@@ -16,6 +16,9 @@ crawl:
 crawl_terra:
 	docker compose run scraper python crawl.py terraspider
 
+crawl_maisgoias:
+	docker compose run scraper python crawl.py maisgoiasspider
+
 init_db:
 	docker compose run scraper python create_db.py
 
