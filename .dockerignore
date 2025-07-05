@@ -1,2 +1,124 @@
-docker/
+# =====================================
+# .dockerignore - Check-up Project
+# =====================================
+
+# Git e controle de versão
 .git
+.gitignore
+.gitattributes
+.github/
+
+# Docker
+docker/
+Dockerfile*
+docker-compose*.yml
+compose.yml
+.dockerignore
+
+# Ambientes e configurações locais
+.env*
+!env.example
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.pipenv/
+
+# pytest
+.tox/
+.nox/
+.coverage
+.pytest_cache/
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# Aplicação específica
+sessions/
+logs/
+screenshots/
+plog/
+data/
+tmp/
+.tmp/
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Documentação e recursos
+*.md
+!README.md
+docs/
+cover.png
+
+# Backup files
+*.bak
+*.backup
+*.old
+
+# Arquivos temporários
+*.tmp
+*.temp
+*.log
+
+# Node.js (se houver frontend)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Outros
+*.pid
+*.seed
+*.pid.lock

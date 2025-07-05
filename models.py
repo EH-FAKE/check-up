@@ -14,8 +14,7 @@ from sqlalchemy import (
     Text,
     JSON,
 )
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.schema import UniqueConstraint
 from sqlalchemy.sql.expression import func
 from sqlalchemy_utils import ChoiceType, URLType
@@ -25,7 +24,9 @@ from utils.date import now, folder_date
 from storage import upload_file
 
 
-Base = declarative_base()
+class Base(DeclarativeBase):
+    """Base class for all database models using SQLAlchemy 2.0+ syntax."""
+    pass
 
 
 def get_or_create_portal(session, portal_id):
@@ -45,10 +46,10 @@ class Portal(Base):
     __tablename__ = "portal"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    name = Column(String, unique=True, nullable=False)
-    url = Column(URLType, unique=True, nullable=False)
-    slug = Column(URLType, unique=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    url: Mapped[str] = mapped_column(URLType, unique=True, nullable=False)
+    slug: Mapped[str] = mapped_column(URLType, unique=True, nullable=False)
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
 
     entries: Mapped[List["Entry"]] = relationship(back_populates="portal")
 
@@ -61,13 +62,13 @@ class Entry(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     portal_id: Mapped[int] = mapped_column(ForeignKey("portal.id"))
-    title = Column(String, nullable=False)
-    url = Column(URLType, nullable=False)
-    description = Column(String, nullable=True)
-    body = Column(Text, nullable=True)
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    url: Mapped[str] = mapped_column(URLType, nullable=False)
+    description: Mapped[str] = mapped_column(String, nullable=True)
+    body: Mapped[str] = mapped_column(Text, nullable=True)
     tags = Column(JSON, nullable=True)
-    screenshot = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    screenshot: Mapped[str] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
 
     portal: Mapped["Portal"] = relationship(back_populates="entries")
     ads: Mapped[List["Advertisement"]] = relationship(back_populates="entry")
@@ -88,18 +89,18 @@ class Entry(Base):
 class Advertisement(Base):
     __tablename__ = "advertisement"
 
-    id = Column(Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     entry_id: Mapped[int] = mapped_column(ForeignKey("entry.id"))
-    url = Column(URLType, nullable=False)
-    title = Column(String, nullable=False)
-    tag = Column(String, nullable=True)
-    thumbnail = Column(URLType, nullable=True)
-    screenshot = Column(String, nullable=True)
-    excerpt = Column(String, nullable=True)
-    media = Column(String, nullable=True)
-    category = Column(Integer, nullable=True)
-    category_verbose = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    url: Mapped[str] = mapped_column(URLType, nullable=False)
+    title: Mapped[str] = mapped_column(String, nullable=False)
+    tag: Mapped[str] = mapped_column(String, nullable=True)
+    thumbnail: Mapped[str] = mapped_column(URLType, nullable=True)
+    screenshot: Mapped[str] = mapped_column(String, nullable=True)
+    excerpt: Mapped[str] = mapped_column(String, nullable=True)
+    media: Mapped[str] = mapped_column(String, nullable=True)
+    category: Mapped[int] = mapped_column(Integer, nullable=True)
+    category_verbose: Mapped[str] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
 
     entry: Mapped["Entry"] = relationship(back_populates="ads")
 
@@ -129,9 +130,9 @@ class Advertisement(Base):
 class URLQueue(Base):
     __tablename__ = "urlqueue"
 
-    id = Column(Integer, primary_key=True)
-    url = Column(URLType, nullable=False)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    url: Mapped[str] = mapped_column(URLType, nullable=False)
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
     statuses: Mapped[List["QueueStatus"]] = relationship(back_populates="url_queue")
 
     @classmethod
@@ -211,12 +212,12 @@ class QueueStatus(Base):
         Finished = 2
         Error = 3
 
-    id = Column(Integer, primary_key=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
     url_queue_id: Mapped[int] = mapped_column(ForeignKey("urlqueue.id"))
-    value = Column(ChoiceType(Statuses, impl=Integer()), nullable=False)
-    current = Column(Boolean, default=False, nullable=False)
-    info = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    value: Mapped[Statuses] = mapped_column(ChoiceType(Statuses, impl=Integer()), nullable=False)
+    current: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    info: Mapped[str] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime, default=datetime.datetime.utcnow)
     url_queue: Mapped["URLQueue"] = relationship(back_populates="statuses")
 
     def __repr__(self):

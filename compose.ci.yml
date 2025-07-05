@@ -1,0 +1,101 @@
+networks:
+  ci-network:
+    driver: bridge
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: ci_db
+    hostname: ci_db
+    
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: test_healthcheck
+      POSTGRES_INITDB_ARGS: "--data-checksums --encoding=UTF8 --locale=C"
+    
+    ports:
+      - "5432:5432"
+    
+    networks:
+      - ci-network
+    
+    command: >
+      postgres
+      -c shared_buffers=128MB
+      -c max_connections=100
+      -c random_page_cost=1.1
+      -c effective_cache_size=512MB
+      -c maintenance_work_mem=32MB
+      -c checkpoint_completion_target=0.7
+      -c wal_buffers=8MB
+      -c log_statement=none
+      -c fsync=off
+      -c synchronous_commit=off
+      -c full_page_writes=off
+    
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -h localhost"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    
+    tmpfs:
+      - /var/lib/postgresql/data:noexec,nosuid,size=512m
+
+  minio:
+    image: minio/minio:RELEASE.2024-01-16T16-07-38Z
+    container_name: ci_minio
+    hostname: ci_minio
+    
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    
+    networks:
+      - ci-network
+    
+    command: server /data --console-address ":9001"
+    
+    # Removendo health check complexo
+    # MinIO será iniciado com sleep no CI
+
+  # =====================================
+  # Aplicação para testes
+  # =====================================
+  scraper:
+    image: check-up:test
+    container_name: ci_scraper
+    hostname: ci_scraper
+    
+    environment:
+      HEADLESS: "true"
+      DATABASE_URL: postgresql://postgres:postgres@ci_db:5432/test_healthcheck
+      MINIO_ENDPOINT: ci_minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_SECURE: "false"
+      MINIO_BUCKET: test-bucket
+      SCRAPER_TIMEOUT: 300
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+      # CI específico
+      CI: "true"
+      PYTEST_TIMEOUT: 600
+    
+    networks:
+      - ci-network
+    
+    depends_on:
+      - db
+      - minio
+    
+    volumes:
+      - ./:/project/:rw
+      - ./logs:/project/logs:rw
+      - ./screenshots:/project/screenshots:rw
+      - ./sessions:/project/sessions:rw 
