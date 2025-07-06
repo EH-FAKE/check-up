@@ -31,11 +31,17 @@ minio_client = Minio(
 )
 
 # Carregar variáveis do .env da raiz do projeto
-load_dotenv(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../.env')))
+load_dotenv(
+    os.path.abspath(
+        os.path.join(
+            os.path.dirname(__file__),
+            '../../.env')))
+
 
 @app.get("/ping")
 def ping():
     return {"status": "ok"}
+
 
 @app.get("/portais", response_model=List[str])
 def listar_portais():
@@ -48,13 +54,18 @@ def listar_portais():
                 nome_portal = obj.object_name.rstrip('/')
                 portais.add(nome_portal)
             else:
-                # Caso não venha como diretório, extrai o prefixo do nome do objeto
+                # Caso não venha como diretório, extrai o prefixo do nome do
+                # objeto
                 partes = obj.object_name.split('/')
                 if len(partes) > 1:
                     portais.add(partes[0])
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao acessar o MinIO: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao acessar o MinIO: {
+                str(e)}")
     return sorted(list(portais))
+
 
 @app.get("/noticias/{portal}")
 def listar_noticias(
@@ -64,15 +75,18 @@ def listar_noticias(
     prefix = f"{portal}/"
     noticias = []
     try:
-        objetos = minio_client.list_objects(MINIO_BUCKET, prefix=prefix, recursive=True)
+        objetos = minio_client.list_objects(
+            MINIO_BUCKET, prefix=prefix, recursive=True)
         for obj in objetos:
             if obj.object_name.endswith('.json'):
                 try:
-                    response = minio_client.get_object(MINIO_BUCKET, obj.object_name)
+                    response = minio_client.get_object(
+                        MINIO_BUCKET, obj.object_name)
                     conteudo = response.read()
                     noticia = json.loads(conteudo.decode('utf-8'))
                     # Padronizar campo de data
-                    data_str = noticia.get('date') or noticia.get('publishedAt') or noticia.get('createdAt')
+                    data_str = noticia.get('date') or noticia.get(
+                        'publishedAt') or noticia.get('createdAt')
                     if data_str:
                         try:
                             data = datetime.fromisoformat(data_str[:10])
@@ -85,7 +99,10 @@ def listar_noticias(
                 except Exception:
                     continue
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao acessar o MinIO: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao acessar o MinIO: {
+                str(e)}")
 
     # Ordenação
     reverse = order == 'desc'
@@ -97,6 +114,7 @@ def listar_noticias(
 
     return noticias
 
+
 @app.get("/noticias/{portal}/search")
 def buscar_noticias(
     portal: str,
@@ -107,11 +125,13 @@ def buscar_noticias(
     prefix = f"{portal}/"
     resultados = []
     try:
-        objetos = minio_client.list_objects(MINIO_BUCKET, prefix=prefix, recursive=True)
+        objetos = minio_client.list_objects(
+            MINIO_BUCKET, prefix=prefix, recursive=True)
         for obj in objetos:
             if obj.object_name.endswith('.json'):
                 try:
-                    response = minio_client.get_object(MINIO_BUCKET, obj.object_name)
+                    response = minio_client.get_object(
+                        MINIO_BUCKET, obj.object_name)
                     conteudo = response.read()
                     noticia = json.loads(conteudo.decode('utf-8'))
                     # Busca em título, descrição, body e tags
@@ -123,7 +143,8 @@ def buscar_noticias(
                     ]
                     if any(termo in campo.lower() for campo in campos):
                         # Padronizar campo de data
-                        data_str = noticia.get('date') or noticia.get('publishedAt') or noticia.get('createdAt')
+                        data_str = noticia.get('date') or noticia.get(
+                            'publishedAt') or noticia.get('createdAt')
                         if data_str:
                             try:
                                 data = datetime.fromisoformat(data_str[:10])
@@ -136,7 +157,10 @@ def buscar_noticias(
                 except Exception:
                     continue
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erro ao acessar o MinIO: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erro ao acessar o MinIO: {
+                str(e)}")
 
     # Ordenação
     reverse = order == 'desc'
@@ -146,4 +170,4 @@ def buscar_noticias(
     for n in resultados:
         n.pop('_data', None)
 
-    return resultados 
+    return resultados
