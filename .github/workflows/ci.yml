@@ -97,6 +97,7 @@ jobs:
     name: Docker Build and Test
     runs-on: ubuntu-latest
     needs: [lint, frontend, backend]
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -194,6 +195,7 @@ jobs:
     name: Test Docker Build
     runs-on: ubuntu-latest
     needs: [lint, frontend, backend]
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

@@ -10,7 +10,11 @@ services:
       - ./logs/:/var/log/
     tty: true
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
   db:
     image: postgres:16
     container_name: healthcheck_db
@@ -19,12 +23,19 @@ services:
       - "15433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   minio:
     image: minio/minio
     container_name: healthcheck_minio
     ports:
-      - "9000:9000"  # API
-      - "9001:9001"  # Console
+      - "9000:9000"
+      - "9001:9001"
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
@@ -55,6 +66,4 @@ services:
       
 volumes:
   pgdata:
-    driver: local
   minio_data:
-    driver: local
