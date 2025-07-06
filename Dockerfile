@@ -1,24 +1,26 @@
 # builder
-FROM docker.io/python:3.12.3 AS builder
+FROM python:3.12.3 AS builder
 
-# Install pipenv
+# Instala o pipenv
 RUN pip install --user pipenv
 
+# Cria o venv dentro do projeto
 ENV PIPENV_VENV_IN_PROJECT=1
 
+# Copia arquivos de dependência
 COPY Pipfile Pipfile.lock /usr/src/
 WORKDIR /usr/src
 
-# Install all dependencies (including dev, so playwright is installed)
+# Instala dependências com pipenv
 RUN /root/.local/bin/pipenv sync --dev
 
-# Verify Playwright is available in venv
+# Verifica se playwright foi instalado
 RUN /usr/src/.venv/bin/python -c "import playwright; print(playwright)"
 
 # runtime
-FROM docker.io/python:3.12.3 AS runtime
+FROM python:3.12.3 AS runtime
 
-# Copy the virtualenv from builder
+# Copia o ambiente virtual
 COPY --from=builder /usr/src/.venv/ /usr/src/.venv/
 
 # Install OS-level dependencies required by Playwright browsers
@@ -58,9 +60,10 @@ RUN apt-get update \
     libxtst6 \
     wget \
     xdg-utils \
+
     && rm -rf /var/lib/apt/lists/*
 
-# Ensure the venv's bin directory is on PATH
+# Define variáveis de ambiente
 ENV PATH=/usr/src/.venv/bin:$PATH
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
@@ -68,10 +71,10 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /project
 COPY . /project
 
-# Install minio package
+# Instala pacote do minio
 RUN pip install minio==7.2.15
 
-# Download Playwright browser binaries (Firefox only) along with necessary deps
+# Instala navegador do playwright
 RUN playwright install --with-deps firefox
 
 # Install scrapy-playwright extension
