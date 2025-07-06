@@ -1,4 +1,5 @@
 import scrapy
+from scrapy_playwright.page import PageMethod
 
 from scrapy_playwright.page import PageMethod
 from spiders.base import BaseSpider
@@ -39,7 +40,6 @@ class IGSpider(BaseSpider):
 
     def parse(self, response):
         self.logger.info(f"Visitando: {response.url}")
-
 
         for entry in response.css("a.title"):
             url = entry.attrib.get("href")

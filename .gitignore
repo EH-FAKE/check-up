@@ -6,3 +6,5 @@ collections/
 sessions/
 logs/
 __pycache__
+/data
+/screenshots

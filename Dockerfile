@@ -1,41 +1,31 @@
-# ======================
-# Builder
-# ======================
-FROM python:3.11-slim as builder
+# builder
+FROM python:3.12.3 AS builder
 
-# Instala dependências de build necessárias para compilar pacotes Python nativos
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    gcc \
-    g++ \
-    curl \
-    git \
-    && rm -rf /var/lib/apt/lists/*
+# Instala o pipenv com versão fixa
+RUN pip install --user pipenv==2023.12.1
 
-# Instala o gerenciador de dependências Pipenv
-RUN pip install pipenv
-
-# Define que o ambiente virtual ficará no diretório do projeto
+# Cria o venv dentro do projeto
 ENV PIPENV_VENV_IN_PROJECT=1
 
+# Copia apenas os arquivos de dependência primeiro para melhor utilização de cache
+COPY Pipfile Pipfile.lock /usr/src/
 WORKDIR /usr/src
 
-# Copia os arquivos de dependências
-COPY Pipfile Pipfile.lock ./
+# Instala dependências com pipenv
+RUN /root/.local/bin/pipenv sync --dev
 
-# Instala as dependências do projeto no ambiente virtual
-RUN pipenv install --deploy --dev
+# Verifica se playwright foi instalado
+RUN /usr/src/.venv/bin/python -c "import playwright; print(playwright)"
 
-# Copia todo o código-fonte para a imagem
-COPY . .
+# runtime
+FROM python:3.12.3-slim AS runtime
 
-# ======================
-# Runtime
-# ======================
-FROM python:3.11-slim as runtime
+# Copia o ambiente virtual
+COPY --from=builder /usr/src/.venv/ /usr/src/.venv/
 
-# Instala bibliotecas de sistema necessárias para execução do Python e do navegador Firefox usado pelo Playwright
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install OS-level dependencies required by Playwright browsers
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
     ca-certificates \
     fonts-liberation \
     libasound2 \
@@ -70,24 +60,40 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxtst6 \
     wget \
     xdg-utils \
+
     && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /usr/src
 
-# Copia o ambiente virtual criado na fase de build
-COPY --from=builder /usr/src/.venv/ /usr/src/.venv/
+# Define variáveis de ambiente
+ENV PATH=/usr/src/.venv/bin:$PATH \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
-# Adiciona o ambiente virtual ao PATH
-ENV PATH=/usr/src/.venv/bin:$PATH
+# Instala pacote do minio e playwright antes de copiar o código-fonte
+# para aproveitar melhor o cache de camadas
+RUN pip install minio==7.2.15 && \
+    playwright install --with-deps firefox
 
-# Instala os navegadores necessários para o Playwright funcionar
-RUN playwright install --with-deps firefox
+# Configuração do diretório de trabalho
+WORKDIR /project
 
-# Configurações para otimizar o comportamento do Python no container
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+# Cria usuário não-root
+RUN groupadd -r scraper && \
+    useradd --no-log-init -r -g scraper -d /project scraper && \
+    chown -R scraper:scraper /project /usr/src/.venv
 
-# Instalação explícita do cliente MinIO
-RUN pip install minio==7.2.15
+# Copia o código-fonte para o diretório de trabalho
+COPY --chown=scraper:scraper . /project
 
+# Muda para o usuário não-root
+USER scraper
+
+# Health check para verificar se o container está saudável
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD python -c "import sys; sys.exit(0)"
+
+# Install scrapy-playwright extension
+RUN pip install scrapy-playwright==0.0.43
+
+# Comando padrão ao iniciar o container
 CMD ["ipython"]
