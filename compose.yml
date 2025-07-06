@@ -41,7 +41,23 @@ services:
       interval: 30s
       timeout: 20s
       retries: 3
-
+  frontend:
+    build:
+      context: ./web/client
+    container_name: ehfake_frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+  backend:
+    build:
+      context: ./web/server
+    container_name: ehfake_backend
+    ports:
+      - "8000:8000"
+    depends_on:
+      - minio
+      
 volumes:
   pgdata:
   minio_data:
