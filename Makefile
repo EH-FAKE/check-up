@@ -16,11 +16,8 @@ crawl:
 crawl_metropoles:
 	docker compose run scraper python crawl.py metropolesspider
 
-crawl_maisgoias:
-	docker compose run scraper python crawl.py maisgoiasspider
-
-crawl_aliadosBrasil:
-	docker compose run scraper python crawl.py aliadosbrasilspider
+crawl_r7:
+	docker compose run scraper python crawl.py r7spider
 
 init_db:
 	docker compose run scraper python create_db.py
