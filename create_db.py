@@ -14,6 +14,14 @@ from models import (
 if __name__ == "__main__":
     engine = create_engine(config("DATABASE_URL"))
 
+    # Primeiro, dropa todas as tabelas existentes
+    Advertisement.metadata.drop_all(engine)
+    URLQueue.metadata.drop_all(engine)
+    Entry.metadata.drop_all(engine)
+    Portal.metadata.drop_all(engine)
+    QueueStatus.metadata.drop_all(engine)
+
+    # Recria todas as tabelas
     Portal.metadata.create_all(engine)
     Entry.metadata.create_all(engine)
     Advertisement.metadata.create_all(engine)

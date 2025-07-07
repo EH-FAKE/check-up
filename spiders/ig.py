@@ -1,6 +1,7 @@
 import scrapy
 from scrapy_playwright.page import PageMethod
 
+from scrapy_playwright.page import PageMethod
 from spiders.base import BaseSpider
 from spiders.items import URLItem
 

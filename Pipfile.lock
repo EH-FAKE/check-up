@@ -5,7 +5,7 @@
         },
         "pipfile-spec": 6,
         "requires": {
-            "python_version": "3.12"
+            "python_version": "3.11"
         },
         "sources": [
             {
@@ -115,6 +115,7 @@
             ],
             "markers": "python_version >= '3.7'",
             "version": "==2025.6.15"
+
         },
         "cffi": {
             "hashes": [

@@ -1,5 +1,4 @@
 from playwright.sync_api import TimeoutError, sync_playwright
-
 from plays.base import BasePlay
 from plays.items import EntryItem
 from plog import logger
@@ -67,14 +66,16 @@ class IGPlay(BasePlay):
 
                         content_elements = page.locator(selector)
                         count = content_elements.count()
-                        logger.debug(
-                            f"[{self.name}] Found {count} elements for {selector}")
+                        logger.debug(f"[{self.name}] Found {count} elements for {selector}")
+
 
                         if count > 0:
                             paragraphs = []
                             for i in range(count):
+
                                 text = content_elements.nth(
                                     i).inner_text().strip()
+
                                 if text:
                                     paragraphs.append(text)
                             body = "\n\n".join(paragraphs)
@@ -110,6 +111,7 @@ class IGPlay(BasePlay):
                                     for tag in content.split(",") if tag.strip()]
             except Exception as e:
                 logger.warning(f"[{self.name}] Failed to extract tags: {e}")
+
 
             return EntryItem(
                 title=entry_title,
