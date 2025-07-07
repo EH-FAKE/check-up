@@ -10,144 +10,242 @@ Apesar de funcionar apenas com os dez sites cobertos pelo projeto, este código 
 
 O código deste projeto pode ser usado apenas para fins não-comerciais e com atribuição de crédito.
 
-## 🚀 CI/CD, Build e Desenvolvimento Local
+## 🚀 Como Rodar o Projeto
 
-### 📋 Visão Geral do Fluxo de Desenvolvimento
-- **Build Docker otimizado:** O `Dockerfile` foi estruturado para build multi-stage, cache eficiente e instalação automática dos browsers do Playwright. Agora o build funciona de forma confiável em qualquer ambiente.
-- **Makefile completo:** O novo `Makefile` centraliza todos os comandos de setup, build, testes, coleta de dados, pipelines de desenvolvimento e produção, além de targets para CI/CD local e integração com o GitHub Actions.
-- **Workflows CI/CD:** O repositório inclui `.github/workflows/ci.yml` para CI completo (lint, build, testes, compose) e `.github/workflows/local-ci.yml` para rodar checagens rápidas localmente usando [act](https://github.com/nektos/act).
-- **Testes otimizados:** Testes unitários, de scraping, integração e infraestrutura podem ser executados facilmente via Makefile ou workflows.
-- **Ambiente isolado:** Uso de Docker Compose para orquestrar banco, MinIO, scraper e ferramentas auxiliares.
+### 📋 Pré-requisitos
+- Docker e Docker Compose instalados
+- Make (disponível por padrão no macOS e Linux)
 
-### ⚡ Comandos Rápidos (Makefile)
+### 🔧 Configuração Inicial
+
+**1. Setup completo do ambiente:**
 ```bash
-# Setup completo do ambiente (inclui build, browsers, banco, migrações)
 make setup
+```
+Este comando faz toda a configuração inicial:
+- Cria o arquivo `.env` a partir do `env.example`
+- Inicia os serviços Docker (PostgreSQL, MinIO, scraper)
+- Aguarda o banco de dados ficar pronto
+- Cria as tabelas necessárias
+- Executa as migrações
 
-# Setup rápido (reaproveita browsers já instalados)
-make setup-fast
+### 📊 Fluxo de Coleta de Dados
 
-# Build da imagem Docker (multi-stage, cache, playwright)
-make build
+O processo de coleta acontece em duas etapas principais:
 
-# Iniciar/Parar serviços
-make start
-make stop
+**🕷️ Etapa 1: Crawling (Coleta de URLs)**
 
-# Limpeza total do ambiente
-make clean
-
-# Executar todos os testes (unitários, scraping, integração)
-make test
-
-# Testes específicos
-make test_rbs
-make test_base
-make test_integration
-make test_scrape-no-openai
-
-# Lint e formatação
-make lint
-make format
-
-# Pipeline de desenvolvimento (lint, testes rápidos, scraping)
-make dev-pipeline
-
-# Pipeline de produção (lint, segurança, build, push)
-make prod-pipeline
+Colete URLs de todos os portais funcionais:
+```bash
+make crawl_all_working
 ```
 
-### 🧪 Testes Locais e CI
-- **Testes locais rápidos:**
-  - `make test` — executa todos os testes
-  - `make test_fast` — executa apenas testes rápidos
-  - `make test_coverage` — executa testes com relatório de cobertura
-- **CI Local com Act:**
-  - Instale o [act](https://github.com/nektos/act): `brew install act`
-  - Rode o workflow local:
-    ```bash
-    make ci-act-local      # Workflow local rápido (lint, docker, compose)
-    make ci-act-local-lint # Apenas lint local
-    make ci-act-local-docker # Teste rápido de build Docker
-    ```
-  - O workflow local simula `.github/workflows/ci.yml` e garante que o build e os testes funcionarão no CI do GitHub.
+Ou execute individualmente:
+```bash
+make crawl_metropoles    # Portal Metrópoles
+make crawl_veja         # Portal Veja  
+make crawl_r7           # Portal R7
+make crawl_uol          # Portal UOL
+make crawl_maisgoias    # Portal MaisGoiás
+make crawl_aliadosBrasil # Portal AliadosBrasil
+make crawl_ig           # Portal IG
+make crawl_folha        # Portal Folha
+```
 
-### 🐳 Build Docker e Troubleshooting
-- O `Dockerfile` agora está multi-stage, instala browsers do Playwright, e faz healthcheck do ambiente.
-- Para build manual:
-  ```bash
-  docker build -t check-up:latest .
-  ```
-- Para rodar comandos dentro do container:
-  ```bash
-  make bash
-  ```
-- Se precisar reinstalar browsers:
-  ```bash
-  make install-browsers
-  ```
+**📰 Etapa 2: Scraping (Extração de Anúncios)**
 
-### 🗃️ Banco de Dados e MinIO
-- O ambiente já sobe PostgreSQL e MinIO via Compose.
-- Variáveis `.env` controlam acesso e credenciais.
-- Os resultados de scraping são salvos no banco e no MinIO automaticamente.
+Execute o scraping de todos os portais:
+```bash
+make scrape_all_working
+```
 
-### 🕸️ Estrutura de Spiders e Plays
-- Cada portal tem um spider Scrapy (`spiders/`) e um script Playwright (`plays/`).
-- Para adicionar novo portal, siga o modelo dos arquivos existentes e veja exemplos no README.
-- O scraping pode ser executado com ou sem classificação LLM, e agora aceita argumentos de timeout e plataforma via CLI:
-  ```bash
-  make scrape-no-ai TIMEOUT=900 PLATFORM=firefox
-  ```
+Ou execute por portal específico:
+```bash
+make scrape_metropoles     # Scraping do Metrópoles
+make scrape_maisgoias      # Scraping do MaisGoiás
+make scrape_aliadosbrasil  # Scraping do AliadosBrasil
+make scrape_ig             # Scraping do IG
+make scrape_veja           # Scraping da Veja
+make scrape_r7             # Scraping do R7
+make scrape_uol            # Scraping do UOL
+make scrape_folha          # Scraping da Folha
+```
 
-### 🧑‍💻 Contribuição e Fluxo de Branch/Commit
-- Siga o guia de contribuição (ver [política de branches](https://eh-fake.github.io/docs/guia-de-contribuicao/politica-de-branches/), [guia de commits](https://eh-fake.github.io/docs/guia-de-contribuicao/guia-de-commits/)).
-- Use Conventional Commits e Git Flow para branch/PR.
-- Nunca faça push direto para `main` ou `develop`.
-- Sempre rode os testes e o lint antes de abrir PR.
+### ⚡ Workflows Automatizados
+
+**Pipeline completo (crawl + scraping):**
+```bash
+make pipeline_complete
+```
+
+**Coleta otimizada:**
+```bash
+make collect_working
+```
+
+### 🛠️ Comandos Úteis
+
+**Acessar o container:**
+```bash
+make bash
+```
+
+**Ver logs dos serviços:**
+```bash
+docker compose logs -f
+```
+
+**Parar serviços:**
+```bash
+make stop
+```
+
+**Ver todos os comandos disponíveis:**
+```bash
+make help
+```
+
+### � Onde os Dados São Salvos
+
+- **URLs coletadas**: Salvos no banco PostgreSQL (tabela `URLQueue`)
+- **Anúncios extraídos**: Salvos no banco PostgreSQL (tabela `Advertisement`) 
+- **Screenshots e arquivos**: Salvos no MinIO (acessível em `http://localhost:9001`)
+- **Logs**: Disponíveis via `docker compose logs`
+
+### � Configurações Importantes
+
+**Variáveis de ambiente (arquivo `.env`):**
+- Credenciais dos portais (se necessário)
+- Configurações do banco PostgreSQL
+- Configurações do MinIO para armazenamento
+- Chave da API OpenAI (opcional, para classificação)
 
 ---
 
-## Portais de notícias
-Este repositório inicialmente contempla a coleta de notícias dos seguintes portais:
+## 📊 Portais de Notícias Suportados
 
- - [Estadão](https://www.estadao.com.br)
- - [Folha](https://www.folha.uol.com.br)
- - [Globo](https://oglobo.globo.com/)
- - [IG](https://www.ig.com.br)
- - [Metrópoles](https://www.metropoles.com)
- - [R7](https://www.r7.com)
- - [RBS](https://www.clicrbs.com.br)
- - [Terra](https://www.terra.com.br)
- - [Veja](https://veja.abril.com.br)
- - [UOL](https://www.uol.com.br)
+Este projeto coleta dados dos seguintes portais brasileiros:
 
-## Execução dos Scripts
+### ✅ **Portais Funcionais** (Totalmente operacionais)
+- **[Metrópoles](https://www.metropoles.com)** - `make crawl_metropoles` / `make scrape_metropoles`
+- **[IG](https://www.ig.com.br)** - `make crawl_ig` / `make scrape_ig`  
+- **[MaisGoiás](https://www.maisgoias.com.br)** - `make crawl_maisgoias` / `make scrape_maisgoias`
+- **[AliadosBrasil](https://www.aliadosbrasiloficial.com.br)** - `make crawl_aliadosBrasil` / `make scrape_aliadosbrasil`
+- **[Veja](https://veja.abril.com.br)** - `make crawl_veja` / `make scrape_veja`
+- **[R7](https://www.r7.com)** - `make crawl_r7` / `make scrape_r7`
+- **[UOL](https://www.uol.com.br)** - `make crawl_uol` / `make scrape_uol`
+- **[Folha](https://www.folha.uol.com.br)** - `make crawl_folha` / `make scrape_folha`
 
-### Iniciar os Serviços
+### 🔧 **Em Desenvolvimento**
+- **[Estadão](https://www.estadao.com.br)** - Necessita ajustes nos seletores CSS
+- **[Globo](https://oglobo.globo.com/)** - Requer configurações específicas de autenticação
+- **[RBS](https://www.clicrbs.com.br)** - Spider em desenvolvimento
+- **[Terra](https://www.terra.com.br)** - Aguardando implementação
 
-Para iniciar os serviços necessários, utilize o comando:
+## 🗄️ Estrutura do Banco de Dados
 
-`make start`
+As seguintes tabelas são criadas automaticamente durante o setup:
 
-Este comando inicia um container docker com um banco de dados
-e um container com `shell` com Python instalado.
+- **Portal**: Informações dos portais analisados
+- **Entry**: Notícias coletadas de cada portal  
+- **Advertisement**: Anúncios encontrados nas notícias
+- **URLQueue**: Fila de URLs para o processo de scraping
+- **QueueStatus**: Status de cada fila de scraping
 
+**Nota:** Mais detalhes sobre a estrutura das tabelas estão disponíveis no arquivo `models.py`.
 
-### 1- Iniciar as tabelas do banco de dados
-Para criar as tabelas necessárias, execute:
+## 🧑‍💻 Desenvolvimento e Contribuição
 
-`make init_db`
+### 🐳 Build Docker e Troubleshooting
+- O `Dockerfile` usa multi-stage build com instalação automática dos browsers do Playwright
+- Para build manual: `docker build -t check-up:latest .`
+- Para acessar o container: `make bash`
 
-As seguintes tabelas serão criadas:
+### 🧪 Estrutura de Spiders e Plays
+- Cada portal tem um spider Scrapy (`spiders/`) e um script Playwright (`plays/`)
+- Para adicionar novo portal, siga o modelo dos arquivos existentes
+- O scraping aceita argumentos de timeout e plataforma via CLI
 
- - Portal: Informações dos portais analisados.
- - Entry: Notícias coletadas de cada portal.
- - Advertisement: Anúncios encontrados nas notícias.
- - URLQueue: Fila de URLs para o processo de scraping.
- - QueueStatus: Status de cada fila de scraping.
+### 📝 Fluxo de Contribuição
+- Siga as políticas de branches e commits do projeto
+- Use Conventional Commits e Git Flow
+- Sempre rode os testes antes de abrir PR
+- Nunca faça push direto para `main` ou `develop`
 
-**Nota:** mais detalhes sobre a estrutura das tabelas estão disponíveis no arquivo `models.py`.
+## 🚨 Troubleshooting
+
+### Problemas Comuns
+
+**1. Erro "Playwright browsers not installed"**
+```bash
+# Se o IG spider falhar, reconstrua a imagem Docker:
+docker compose down
+docker compose build --no-cache
+make start
+```
+
+**2. Container não conecta ao banco**
+```bash
+# Aguarde o banco ficar pronto:
+make wait-for-db
+# Ou reinicie os serviços:
+make stop && make start
+```
+
+**3. MinIO não acessível**
+```bash
+# Verifique se o MinIO está rodando:
+docker compose ps
+# Acesse: http://localhost:9001 (admin: minioadmin/minioadmin)
+```
+
+**4. Containers órfãos**
+```bash
+# Limpe containers órfãos:
+docker compose down --remove-orphans
+make prune
+```
+
+### 💡 Exemplos Práticos
+
+**Coleta rápida de um portal específico:**
+```bash
+# Setup inicial (só uma vez)
+make setup
+
+# Coleta do Metrópoles (exemplo)
+make crawl_metropoles
+make scrape_metropoles
+```
+
+**Pipeline completo para produção:**
+```bash
+# Coleta de todos os portais funcionais
+make pipeline_complete
+```
+
+**Monitoramento em tempo real:**
+```bash
+# Terminal 1 - Execute a coleta
+make crawl_all_working
+
+# Terminal 2 - Monitore os logs  
+docker compose logs -f scraper
+```
+
+**Acesso aos dados coletados:**
+```bash
+# Via container
+make bash
+python -c "
+from models import *
+print('URLs coletadas:', URLQueue.select().count())
+print('Anúncios encontrados:', Advertisement.select().count())
+"
+
+# Via MinIO Console
+open http://localhost:9001
+```
 
 ### 2- Executar as migrações do banco de dados
 Para executar as migrações do banco de dados, utilize:

@@ -8,3 +8,26 @@ logs/
 __pycache__
 /data
 /screenshots
+
+# Cache directories
+.cache/
+.ipython/
+
+# Playwright browsers
+ms-playwright/
+
+# Python cache
+*.pyc
+__pycache__/
+.pytest_cache/
+
+# IDEs
+.vscode/
+.idea/
+
+# Docker
+.dockerignore
+
+# OS
+.DS_Store
+Thumbs.db
