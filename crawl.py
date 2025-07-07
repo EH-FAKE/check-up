@@ -1,4 +1,5 @@
 import sys
+
 from scrapy.crawler import CrawlerProcess
 
 from plog import logger
@@ -42,7 +43,7 @@ def run(spider_name=None):
         # Run all spiders if no specific spider is specified
         for crawler_class in BaseSpider.__subclasses__():
             process.crawl(crawler_class)
-    
+
     process.start()
 
 

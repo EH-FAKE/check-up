@@ -1,11 +1,12 @@
 *.py[co]
+*.pyc
 *.sw[pno]
 .env
 collections/
 *.warc.*
 sessions/
 logs/
-__pycache__
+__pycache__/
 
 # CI/CD Local
 .actrc
@@ -15,6 +16,14 @@ __pycache__
 .docker/
 data/
 screenshots/
+
+# Cache directories
+.cache/
+.ipython/
+.pytest_cache/
+
+# Playwright browsers
+ms-playwright/
 
 # IDE e editores
 .vscode/
@@ -26,4 +35,7 @@ screenshots/
 *.tmp
 *.temp
 *.log
+
+# OS
 .DS_Store
+Thumbs.db

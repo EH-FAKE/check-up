@@ -87,6 +87,10 @@ data/
 tmp/
 .tmp/
 
+# Sessões específicas de portais
+sessions/metropoles_session
+sessions/ig_session
+
 # OS
 .DS_Store
 .DS_Store?

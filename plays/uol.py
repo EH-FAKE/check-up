@@ -3,92 +3,131 @@ import time
 from playwright.sync_api import sync_playwright
 
 from plays.base import BasePlay
-from plays.items import AdItem, EntryItem
-from plays.utils import get_or_none
+from plays.items import EntryItem
 from plog import logger
 
 
 class UOLPlay(BasePlay):
     name = "uol"
-    n_expected_ads = 4
 
     @classmethod
     def match(cls, url):
-        # TODO: use regex in this matcher
-        for domain in [
-            "noticias.uol.com.br",
-            "www.uol.com.br",
-            "educacao.uol.com.br",
-            "economia.uol.com.br",
-        ]:
-            if domain in url:
-                return True
-
-        return False
+        return "uol.com.br" in url
 
     def pre_run(self):
         pass
 
-    def find_items(self, html_content) -> AdItem:
-        return AdItem(
-            title=get_or_none(r'<div class="ad-description">(.*?)</div>', html_content),
-            url=get_or_none(
-                r'link: {\s*[^}]*\bdefault\b[^}].*?"([^"]+)"',
-                html_content
-            ),
-            thumbnail_url=get_or_none(
-                r'image: {\s*default: "(https://tpc\.googlesyndication\.com/simgad/[\d?]+)"',
-                html_content,
-            ),
-            tag=get_or_none(r'<div class="ad-label-footer">(.*?)</div>', html_content),
-        )
-
-    def get_iframe_items(self, iframe_object):
-        iframe_object.scroll_into_view_if_needed()
-        time.sleep(self.wait_time)
-        frame_content = str(iframe_object.element_handles()[0].content_frame())
-        return self.find_items(frame_content)
-
-    def get_most_read_items(self, page_locator):
-        page_items = page_locator.locator(".solar-headline")
-        n_items = page_items.count()
-        items = []
-        for i in range(n_items):
-            item = page_items.nth(i)
-            html_content = item.inner_html()
-            items.append(
-                AdItem(
-                    url=get_or_none(r'<a href="(.*?)"', html_content),
-                    title=get_or_none(r'aria-label="(.*?)"', html_content),
-                    thumbnail_url=get_or_none(r'source srcset="(.*?)"', html_content),
-                    tag=None,
-                )
-            )
-
-        return items
-
     def run(self) -> EntryItem:
         with sync_playwright() as p:
-            browser = self.launch_browser(p)
-            page = browser.new_page()
-            logger.info(f"[{self.name}] Opening URL '{self.url}'...")
-            page.goto(self.url, timeout=60_000)
-            logger.info(f"[{self.name}] Searching for ads...")
-            page.get_by_text("As mais lidas agora").scroll_into_view_if_needed()
-            time.sleep(self.wait_time)
-            ad_items = self.get_iframe_items(
-                page.locator(".type-main").locator("//iframe")
+            browser = self.launch_browser(
+                p,
+                viewport={"width": 1920, "height": 1080},
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36"
             )
-            most_read_items = self.get_most_read_items(page.locator(".jupiter-most-read-now"))
-
-            entry_screenshot_path = self.take_screenshot(page, self.url, goto=False)
-
-            entry_title = page.locator("h1.title").inner_text()
-            all_items = [ad_items] + most_read_items
-
-        return EntryItem(
-            title=entry_title,
-            ads=all_items,
-            url=self.url,
-            screenshot_path=entry_screenshot_path,
-        )
+            page = browser.new_page()
+            
+            # Configurar headers adicionais
+            page.set_extra_http_headers({
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+                "Accept-Encoding": "gzip, deflate, br",
+                "DNT": "1",
+                "Connection": "keep-alive",
+                "Upgrade-Insecure-Requests": "1",
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "none",
+                "Sec-Fetch-User": "?1",
+                "Cache-Control": "max-age=0"
+            })
+            
+            logger.info(f"[{self.name}] Opening URL '{self.url}'...")
+            
+            try:
+                # Tentar carregar a página com timeout maior
+                response = page.goto(self.url, timeout=180_000, wait_until="networkidle")
+                if not response:
+                    logger.error(f"[{self.name}] Failed to load page: no response")
+                    return EntryItem(url=self.url)
+                
+                if response.status >= 400:
+                    logger.error(f"[{self.name}] Failed to load page: status {response.status}")
+                    return EntryItem(url=self.url)
+                
+                # Esperar pelo conteúdo principal com timeout maior
+                selectors = [
+                    ".c-content-head__title h1",  # Título principal
+                    "h1.title",                  # Título alternativo
+                    "h1"                         # Fallback
+                ]
+                
+                title_selector = None
+                for selector in selectors:
+                    if page.locator(selector).count() > 0:
+                        title_selector = selector
+                        break
+                
+                if not title_selector:
+                    logger.error(f"[{self.name}] No title element found")
+                    return EntryItem(url=self.url)
+                
+                # Extrair título
+                entry_title = ""
+                try:
+                    entry_title = page.locator(title_selector).first.inner_text().strip()
+                except Exception as e:
+                    logger.warning(f"[{self.name}] Failed to extract title: {str(e)}")
+                
+                # Extrair corpo do texto
+                body = ""
+                try:
+                    body_selectors = [
+                        ".c-news__body",           # Principal
+                        ".content-text__container", # Alternativo
+                        "article"                  # Fallback
+                    ]
+                    
+                    for selector in body_selectors:
+                        body_element = page.locator(selector)
+                        if body_element.count() > 0:
+                            body = body_element.first.inner_text().strip()
+                            if body:
+                                break
+                    
+                    if not body:
+                        logger.warning(f"[{self.name}] Extracted body is empty")
+                except Exception as e:
+                    logger.warning(f"[{self.name}] Failed to extract article body: {str(e)}")
+                
+                # Extrair tags
+                tags = []
+                try:
+                    tag_selectors = [
+                        ".c-news-tags a",      # Principal
+                        ".tags-article a",    # Alternativo
+                        ".tags a"             # Fallback
+                    ]
+                    
+                    for selector in tag_selectors:
+                        tag_elements = page.locator(selector)
+                        if tag_elements.count() > 0:
+                            for i in range(tag_elements.count()):
+                                tag_text = tag_elements.nth(i).inner_text().strip()
+                                if tag_text and tag_text not in tags:
+                                    tags.append(tag_text)
+                            if tags:
+                                break
+                except Exception as e:
+                    logger.warning(f"[{self.name}] Failed to extract tags: {e}")
+                
+                return EntryItem(
+                    title=entry_title,
+                    url=self.url,
+                    description="",  # No description needed
+                    body=body,
+                    tags=tags,
+                )
+                
+            except Exception as e:
+                logger.error(f"[{self.name}] Failed to process page: {str(e)}")
+                return EntryItem(url=self.url)

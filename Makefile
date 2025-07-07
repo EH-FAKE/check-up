@@ -153,9 +153,86 @@ wait-for-db:
 	@$(DOCKER_COMPOSE) exec db sh -c 'until pg_isready -U postgres -h localhost; do sleep 1; done'
 	@echo "✅ PostgreSQL pronto!"
 
-crawl_maisgoias:
-	docker compose run scraper python crawl.py maisgoiasspider
+# Crawling específico por portal
+crawl-veja: check-browsers
+	$(SCRAPER_RUN) crawl.py vejaspider
 
+crawl-r7: check-browsers
+	$(SCRAPER_RUN) crawl.py r7spider
+
+crawl-uol: check-browsers
+	$(SCRAPER_RUN) crawl.py uolspider
+
+crawl-maisgoias: check-browsers
+	$(SCRAPER_RUN) crawl.py maisgoiasspider
+
+crawl-aliadosbrasil: check-browsers
+	$(SCRAPER_RUN) crawl.py aliadosbrasilspider
+
+crawl-ig: check-browsers
+	$(SCRAPER_RUN) crawl.py igspider
+
+crawl-folha: check-browsers
+	$(SCRAPER_RUN) crawl.py folhaspider
+
+# Scraping específico por portal (sem OpenAI)
+scrape-metropoles: check-browsers
+	$(SCRAPER_RUN) scrape_no_openai.py --platform metropoles.com
+
+scrape-maisgoias: check-browsers
+	$(SCRAPER_RUN) scrape_no_openai.py --platform maisgoias.com.br
+
+scrape-aliadosbrasil: check-browsers
+	$(SCRAPER_RUN) scrape_no_openai.py --platform aliadosbrasiloficial.com.br
+
+scrape-ig: check-browsers
+	$(SCRAPER_RUN) scrape_no_openai.py --platform ig.com.br
+
+scrape-veja: check-browsers
+	$(SCRAPER_RUN) scrape_no_openai.py --platform veja.abril.com.br
+
+scrape-r7: check-browsers
+	$(SCRAPER_RUN) scrape_no_openai.py --platform r7.com
+
+scrape-uol: check-browsers
+	$(SCRAPER_RUN) scrape_no_openai.py --platform uol.com.br
+
+scrape-folha: check-browsers
+	$(SCRAPER_RUN) scrape_no_openai.py --platform folha.uol.com.br
+
+# Workflows de coleta por grupos
+crawl-all-portals: crawl-metropoles crawl-veja crawl-r7 crawl-uol crawl-maisgoias crawl-aliadosbrasil crawl-ig crawl-folha crawl-rbs
+	@echo "✅ Crawl de todos os portais concluído!"
+
+scrape-all-portals: scrape-metropoles scrape-maisgoias scrape-aliadosbrasil scrape-ig scrape-veja scrape-r7 scrape-uol scrape-folha scrape-rbs
+	@echo "✅ Scraping de todos os portais concluído!"
+
+# Pipeline completo: crawl + scrape
+pipeline-complete: crawl-all-portals scrape-all-portals
+	@echo "✅ Pipeline completo concluído!"
+
+# Web Application Commands
+install-web:
+	@echo "📦 Instalando dependências web..."
+	cd web/server && pip install -r requirements.txt
+	cd web/client && pnpm install
+	@echo "✅ Dependências web instaladas!"
+
+run-backend:
+	@echo "🚀 Iniciando backend local..."
+	cd web/server && uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+run-frontend:
+	@echo "🚀 Iniciando frontend local..."
+	cd web/client && pnpm run dev --host 0.0.0.0
+
+start-web: start
+	@echo "🚀 Iniciando aplicação web com Docker..."
+	$(DOCKER_COMPOSE) --profile web up -d backend frontend
+
+stop-web:
+	@echo "🛑 Parando aplicação web..."
+	$(DOCKER_COMPOSE) --profile web down
 init_db:
 	$(SCRAPER_RUN) create_db.py
 
@@ -452,3 +529,5 @@ help:
 	@echo "  make prod-pipeline      - Pipeline de produção"
 	@echo ""
 	@echo "Para mais informações, consulte o README.md"
+
+

@@ -1,6 +1,5 @@
 import scrapy
-
-from spiders import BaseSpider
+from spiders.base import BaseSpider
 from spiders.items import URLItem
 
 

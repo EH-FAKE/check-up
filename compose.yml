@@ -219,6 +219,64 @@ services:
           cpus: '1.0'
 
   # =====================================
+  # Web Application (opcional)
+  # =====================================
+  frontend:
+    build:
+      context: ./web/client
+    container_name: ehfake_frontend
+    hostname: ehfake_frontend
+    restart: unless-stopped
+    
+    ports:
+      - "${FRONTEND_PORT:-5173}:5173"
+    
+    networks:
+      - check-up-network
+    
+    depends_on:
+      - backend
+    
+    profiles:
+      - web
+      - development
+    
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+  backend:
+    build:
+      context: ./web/server
+    container_name: ehfake_backend
+    hostname: ehfake_backend
+    restart: unless-stopped
+    
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    
+    networks:
+      - check-up-network
+    
+    depends_on:
+      db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    
+    profiles:
+      - web
+      - development
+    
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+
+  # =====================================
   # Development Tools (opcional)
   # =====================================
   pgadmin:
