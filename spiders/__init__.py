@@ -10,6 +10,7 @@ from spiders.veja import VejaSpider
 from spiders.terra import TerraSpider
 from spiders.uol import UOLSpider
 from spiders.gazetaDoPovo import GazetaDoPovoSpider
+from spiders.otempo import OTempoSpider
 from spiders.maisGoias import MaisGoiasSpider
 from spiders.aliadosBrasil import AliadosBrasilSpider
 
@@ -26,6 +27,7 @@ __all__ = [
     TerraSpider,
     UOLSpider,
     GazetaDoPovoSpider,
+    OTempoSpider,
     MaisGoiasSpider,
     AliadosBrasilSpider,
 ]

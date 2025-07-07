@@ -84,11 +84,8 @@ crawl_aliadosBrasil:
 crawl_ig:
 	docker compose run scraper python crawl.py igspider
 
-crawl_ig:
-	docker compose exec scraper python crawl.py igspider
-
-scrape_ig:
-	docker compose exec scraper python scrape_no_openai.py --platform ig.com.br
+crawl_otempo:
+	docker compose run scraper python crawl.py otempospider
 
 init_db:
 	docker compose run --rm scraper python create_db.py
