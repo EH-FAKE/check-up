@@ -57,6 +57,31 @@ scrape:
 
 scrape_no_openai:
 	docker compose run --rm scraper python scrape_no_openai.py
+
+# Scraping por plataforma específica (sem OpenAI)
+scrape_metropoles:
+	docker compose exec scraper python scrape_no_openai.py --platform metropoles.com
+
+scrape_maisgoias:
+	docker compose exec scraper python scrape_no_openai.py --platform maisgoias.com.br
+
+scrape_aliadosbrasil:
+	docker compose exec scraper python scrape_no_openai.py --platform aliadosbrasiloficial.com.br
+
+scrape_ig:
+	docker compose exec scraper python scrape_no_openai.py --platform ig.com.br
+
+scrape_veja:
+	docker compose exec scraper python scrape_no_openai.py --platform veja.abril.com.br
+
+scrape_r7:
+	docker compose exec scraper python scrape_no_openai.py --platform r7.com
+
+scrape_uol:
+	docker compose exec scraper python scrape_no_openai.py --platform uol.com.br
+
+scrape_folha:
+	docker compose exec scraper python scrape_no_openai.py --platform folha.uol.com.br
 	
 # Crawler para todos os portais ou específicos
 crawl:
@@ -84,6 +109,44 @@ crawl_aliadosBrasil:
 crawl_ig:
 	docker compose run scraper python crawl.py igspider
 
+crawl_folha:
+	docker compose run scraper python crawl.py folhaspider
+
+# Workflow completo de coleta de URLs
+crawl_all_working:
+	@echo "Executando crawl de todos os portais funcionais..."
+	@make crawl_metropoles
+	@make crawl_veja
+	@make crawl_r7
+	@make crawl_uol
+	@make crawl_maisgoias
+	@make crawl_aliadosBrasil
+	@make crawl_ig
+	@make crawl_folha
+	@echo "Crawl de todos os portais concluído!"
+
+# Workflow completo de scraping
+scrape_all_working:
+	@echo "Executando scraping de todos os portais funcionais..."
+	@make scrape_metropoles
+	@make scrape_maisgoias
+	@make scrape_aliadosbrasil
+	@make scrape_ig
+	@make scrape_veja
+	@make scrape_r7
+	@make scrape_uol
+	@make scrape_folha
+	@echo "Scraping de todos os portais concluído!"
+
+# Pipeline completo: crawl + scrape
+pipeline_complete:
+	@echo "Executando pipeline completo (crawl + scrape)..."
+	@make crawl_all_working
+	@echo "Aguardando 10 segundos antes do scraping..."
+	@sleep 10
+	@make scrape_all_working
+	@echo "Pipeline completo concluído!"
+
 init_db:
 	docker compose run --rm scraper python create_db.py
 
@@ -94,25 +157,51 @@ migrate_db:
 collect: crawl_metropoles scrape_no_openai
 	@echo "Coleta de dados do Metrópoles concluída!"
 
+# Workflow otimizado para coleta de dados
+collect_working: crawl_all_working scrape_all_working
+	@echo "Coleta completa de todos os portais funcionais concluída!"
+
 # Exibir ajuda
 help:
 	@echo "Check-up - Ferramenta de análise de anúncios de saúde"
 	@echo ""
-	@echo "Comandos disponíveis:"
+	@echo "=== COMANDOS DE CONFIGURAÇÃO ==="
 	@echo "  make setup           - Configura o ambiente completo (env + start + init_db + migrate_db)"
 	@echo "  make env             - Cria o arquivo .env a partir do env.example se não existir"
 	@echo "  make start           - Inicia os serviços Docker em background"
 	@echo "  make stop            - Para os serviços Docker"
-	@echo "  make prune           - Remove containers, redes e imagens não utilizadas"
-	@echo "  make wait-for-db     - Aguarda o banco de dados ficar disponível"
-	@echo "  make init_db         - Inicializa as tabelas do banco de dados"
-	@echo "  make migrate_db      - Executa as migrações do banco de dados"
-	@echo "  make crawl           - Coleta URLs de todos os portais"
-	@echo "  make crawl_metropoles - Coleta URLs apenas do portal Metrópoles"
-	@echo "  make scrape          - Coleta anúncios (com classificação OpenAI)"
-	@echo "  make scrape_no_openai - Coleta anúncios (sem classificação OpenAI)"
-	@echo "  make collect         - Executa o workflow completo para Metrópoles"
 	@echo "  make bash            - Acessa o shell do container"
+	@echo ""
+	@echo "=== COMANDOS DE CRAWLING (Coleta de URLs) ==="
+	@echo "  make crawl_all_working - Executa crawl de todos os portais funcionais"
+	@echo "  make crawl_metropoles  - Coleta URLs do portal Metrópoles"
+	@echo "  make crawl_veja        - Coleta URLs do portal Veja"
+	@echo "  make crawl_r7          - Coleta URLs do portal R7"
+	@echo "  make crawl_uol         - Coleta URLs do portal UOL"
+	@echo "  make crawl_maisgoias   - Coleta URLs do portal MaisGoiás"
+	@echo "  make crawl_aliadosBrasil - Coleta URLs do portal AliadosBrasil"
+	@echo "  make crawl_ig          - Coleta URLs do portal IG"
+	@echo "  make crawl_folha       - Coleta URLs do portal Folha"
+	@echo ""
+	@echo "=== COMANDOS DE SCRAPING (Extração de Anúncios) ==="
+	@echo "  make scrape_all_working - Executa scraping de todos os portais funcionais"
+	@echo "  make scrape_metropoles  - Scraping do portal Metrópoles"
+	@echo "  make scrape_maisgoias   - Scraping do portal MaisGoiás"
+	@echo "  make scrape_aliadosbrasil - Scraping do portal AliadosBrasil"
+	@echo "  make scrape_ig          - Scraping do portal IG"
+	@echo "  make scrape_veja        - Scraping do portal Veja"
+	@echo "  make scrape_r7          - Scraping do portal R7"
+	@echo "  make scrape_uol         - Scraping do portal UOL"
+	@echo "  make scrape_folha       - Scraping do portal Folha"
+	@echo ""
+	@echo "=== WORKFLOWS COMPLETOS ==="
+	@echo "  make pipeline_complete  - Executa crawl + scraping de todos os portais"
+	@echo "  make collect_working    - Workflow otimizado para coleta completa"
+	@echo ""
+	@echo "=== OUTROS COMANDOS ==="
+	@echo "  make init_db           - Inicializa as tabelas do banco de dados"
+	@echo "  make migrate_db        - Executa as migrações do banco de dados"
+	@echo "  make prune             - Remove containers, redes e imagens não utilizadas"
 
 .PHONY: start scrape scrape_no_openai scrape_fixed scrape_working install run-backend run-frontend docker-run-backend docker-run-frontend docker-build-backend docker-build-frontend all stop down
 
@@ -150,9 +239,5 @@ all:
 
 # Parar todos os serviços
 down:
-	docker-compose down
-
-# Parar todos os serviços (alias)
-stop:
 	docker-compose down
 
