@@ -9,6 +9,7 @@ from plays.terra import TerraPlay
 from plays.veja import VejaPlay
 from plays.uol import UOLPlay
 from plays.gazetaDoPovo import GazetaDoPovoPlay
+from plays.imirante import ImirantePlay
 from plays.maisGoias import MaisGoias
 from plays.aliadosBrasil import AliadosBrasilPlay
 
@@ -24,6 +25,7 @@ __all__ = [
     VejaPlay,
     UOLPlay,
     GazetaDoPovoPlay,
+    ImirantePlay,
     MaisGoias,
     AliadosBrasilPlay,
 ]

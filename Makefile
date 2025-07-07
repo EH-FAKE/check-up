@@ -84,6 +84,9 @@ crawl_aliadosBrasil:
 crawl_ig:
 	docker compose run scraper python crawl.py igspider
 
+crawl_imirante:
+	docker compose run scraper python crawl.py imirantespider
+
 init_db:
 	docker compose run --rm scraper python create_db.py
 

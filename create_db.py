@@ -40,6 +40,7 @@ if __name__ == "__main__":
         ("IG", "https://www.ig.com.br/", "ig"),
         ("R7", "https://www.r7.com/", "r7"),
         ("Gazeta do Povo", "https://www.gazetadopovo.com.br/", "gazetadopovo"),
+        ("Imirante", "https://imirante.com/", "imirante"),
         ("Mais Goiás", "https://www.maisgoias.com.br/", "maisgoias"),
         ("Aliados Brasil", "https://www.aliadosbrasiloficial.com.br/", "aliadosbrasil"),
     ]
