@@ -1,14 +1,17 @@
+import hashlib
 import shutil
 import time
 import hashlib
 from pathlib import Path
+from tempfile import NamedTemporaryFile
+from typing import List
 
+from playwright.sync_api import TimeoutError as PlayWrightTimeoutError
+from playwright.sync_api import sync_playwright
 
-from playwright.sync_api import TimeoutError as PlayWrightTimeoutError, sync_playwright
-
+from plays.exceptions import ScraperNotFoundError
 from plays.items import EntryItem
 from plays.timeout import PlayerTimeoutError
-from plays.exceptions import ScraperNotFoundError
 from plog import logger
 
 
@@ -80,7 +83,7 @@ class BasePlay:
             *args,
             **kwargs,
         )
-    
+
     def take_screenshot(self, page, url: str, goto: bool = True) -> str:
         """
         Tira um screenshot da página atual (ou navega para a URL se `goto=True`)
@@ -142,7 +145,8 @@ class BasePlay:
                 retries -= 1
 
         if entry_item is None:
-            raise Exception(f"[{self.name}] Failed to scrape content from '{self.url}'")
+            raise Exception(
+                f"[{self.name}] Failed to scrape content from '{self.url}'")
 
         entry_item = self.post_run(entry_item)
         return entry_item

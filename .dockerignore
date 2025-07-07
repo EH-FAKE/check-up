@@ -1,2 +1,6 @@
 docker/
 .git
+sessions/metropoles_session
+sessions/ig_session
+
+

@@ -10,6 +10,7 @@ from plays.veja import VejaPlay
 from plays.uol import UOLPlay
 from plays.gazetaDoPovo import GazetaDoPovoPlay
 from plays.maisGoias import MaisGoias
+from plays.aliadosBrasil import AliadosBrasilPlay
 
 __all__ = [
     ClicRBSPlay,
@@ -23,5 +24,6 @@ __all__ = [
     VejaPlay,
     UOLPlay,
     GazetaDoPovoPlay,
-    MaisGoias
+    MaisGoias,
+    AliadosBrasilPlay,
 ]
