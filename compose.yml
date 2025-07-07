@@ -139,8 +139,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      cache_from:
-        - check-up:latest
       args:
         BUILDPLATFORM: linux/amd64
         TARGETPLATFORM: linux/amd64
@@ -156,6 +154,8 @@ services:
       # Runtime optimizations
       PYTHONUNBUFFERED: 1
       PYTHONDONTWRITEBYTECODE: 1
+      # Force headless mode in containers
+      HEADLESS: "true"
       # Playwright optimizations
       PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
       PLAYWRIGHT_DOWNLOAD_HOST: https://playwright.azureedge.net
