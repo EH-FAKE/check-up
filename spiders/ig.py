@@ -1,6 +1,5 @@
-import re
-
 import scrapy
+from scrapy_playwright.page import PageMethod
 
 from spiders.base import BaseSpider
 from spiders.items import URLItem
@@ -11,21 +10,39 @@ class IGSpider(BaseSpider):
     start_urls = ["https://www.ig.com.br/"]
     allowed_domains = ["ig.com.br"]
 
-    def allow_url(self, entry_url):
-        return (
-            len(entry_url) > 100
-            and re.match(
-                r"https://(ultimosegundo|economia|queer|gente|delas|esporte|carros|"
-                r"canaldopet|receitas|tecnologia|play|turismo|odia).ig.com.br",
-                entry_url,
+    custom_settings = {
+        "DOWNLOAD_HANDLERS": {
+            "http": "scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler",
+            "https": "scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler",
+        },
+        "TWISTED_REACTOR": "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
+        "PLAYWRIGHT_BROWSER_TYPE": "firefox",
+        "PLAYWRIGHT_LAUNCH_OPTIONS": {"headless": True},
+        "PLAYWRIGHT_DEFAULT_NAVIGATION_TIMEOUT": 60 * 1000,
+        "DOWNLOAD_DELAY": 2,
+        "CONCURRENT_REQUESTS": 4,
+    }
+
+    def start_requests(self):
+        for url in self.start_urls:
+            yield scrapy.Request(
+                url,
+                callback=self.parse,
+                meta={
+                    "playwright": True,
+                    "playwright_page_coroutines": [
+                        PageMethod("wait_for_load_state", "load")
+                    ],
+                },
+                dont_filter=True,
             )
-        )
 
     def parse(self, response):
-        url_item = URLItem()
-        for entry in response.css("a"):
+        self.logger.info(f"Visitando: {response.url}")
+
+        for entry in response.css("a.title"):
             url = entry.attrib.get("href")
-            if url and self.allow_url(url):
-                url_item["url"] = url
-                yield url_item
-                yield scrapy.Request(url=url, callback=self.parse)
+            if url:
+                url = response.urljoin(url)
+
+                yield URLItem(url=url)
