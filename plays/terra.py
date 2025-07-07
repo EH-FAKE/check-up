@@ -10,7 +10,7 @@ from plog import logger
 
 class TerraPlay(BasePlay):
     name = "terra"
-    n_expected_ads = 10
+
 
     @classmethod
     def match(cls, url):
