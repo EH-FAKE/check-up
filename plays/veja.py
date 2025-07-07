@@ -1,124 +1,133 @@
 import time
 
-from decouple import config
-from playwright.sync_api import TimeoutError as PlaywrightTimeoutError, sync_playwright
+from playwright.sync_api import sync_playwright
 
 from plays.base import BasePlay
-from plays.items import AdItem, EntryItem
-from plays.utils import get_or_none
+from plays.items import EntryItem
 from plog import logger
 
 
 class VejaPlay(BasePlay):
     name = "veja"
-    n_expected_ads = 10
 
     @classmethod
     def match(cls, url):
         return "veja.abril.com.br" in url
-
-    @classmethod
-    def extra_kwargs(cls):
-        return {
-            "proxy": {
-                "server": config("PROXY_SERVER"),
-                "username": config("PROXY_USERNAME"),
-                "password": config("PROXY_PASSWORD"),
-            }
-        }
-
-    def find_items_mgid_page(self, html_content, element_content) -> AdItem:
-        return AdItem(
-            title=get_or_none(r"<title>(.*?)</title>", html_content),
-            url=get_or_none(r'</script>\n<a href="(.*?)"', html_content),
-            thumbnail_url=get_or_none(r'data-src="(.*?)"', element_content),
-            tag=get_or_none(
-                r'<div class="mcdomain"><a[^>]+>(.*?)<\/a><\/div>',
-                element_content
-            ),
-        )
-
-    def find_items(self, html_content, element_content) -> AdItem:
-        return AdItem(
-            title=get_or_none(r'<h1 class="title">(.*?)</h1>', html_content),
-            url=get_or_none(r'href="(.*?)"', element_content),
-            thumbnail_url=get_or_none(r'data-src="(.*?)"', element_content),
-            tag=None,
-        )
-
-    def parse_elements(self, elements):
-        n_elements = elements.count()
-        elements_row = []
-        for i in range(n_elements):
-            current_element = elements.nth(i)
-            if current_element.inner_text() == "":
-                continue
-            elements_row.append(current_element)
-
-        return elements_row
-
-    def get_hrefs(self, elements):
-        hrefs = []
-        for ele in elements:
-            try:
-                logger.info(f"Getting href attribute from '{ele}'")
-                href = ele.locator("a").first.get_attribute("href")
-                logger.info(f"Got '{href}'")
-                hrefs.append(href)
-            except PlaywrightTimeoutError:
-                logger.error(f"Error getting href from {ele}")
-
-        return hrefs
 
     def pre_run(self):
         pass
 
     def run(self) -> EntryItem:
         with sync_playwright() as p:
-            browser = self.launch_browser(p)
-            page = browser.new_page()
-            logger.info(f"[{self.name}] Opening URL '{self.url}'...")
-            # Increase timeout to account for potential delays introduced by the proxy
-            page.goto(self.url, timeout=180_000)  # 180s
-            logger.info(f"[{self.name}] Searching for ads...")
-            time.sleep(self.wait_time)
-            page.locator(".mgbox").scroll_into_view_if_needed()
-            time.sleep(self.wait_time)
-
-            entry_title = page.locator("h1.title").inner_text()
-
-            elements = page.locator(".mgline")
-            entry_screenshot_path = self.take_screenshot(page, self.url, goto=False)
-
-            elements = self.parse_elements(elements)
-            hrefs = self.get_hrefs(elements)
-
-            elements_content = [ele.inner_html() for ele in elements]
-
-            ad_items = []
-            for element_content, href in zip(elements_content, hrefs):
-                logger.info(f"[{self.name}] Opening AD URL '{href}'")
-
-                # TODO: create `goto` method that has an option to not raise timeout exception
-                try:
-                    page.goto(href, timeout=90_000)
-                except PlaywrightTimeoutError as exc:
-                    logger.warning(f"[{self.name}] {exc}")
-                    continue
-
-                time.sleep(self.wait_time)
-                logger.info(f"[{self.name}] Getting page content '{href}'")
-                page_content = page.content()
-                try:
-                    page.locator(".news__image_big").inner_html()
-                    ad_items.append(self.find_items_mgid_page(page_content, element_content))
-                except PlaywrightTimeoutError:
-                    ad_items.append(self.find_items(page_content, element_content))
-
-            logger.info(f"[{self.name}] Done")
-            return EntryItem(
-                title=entry_title,
-                url=self.url,
-                screenshot_path=entry_screenshot_path,
-                ads=ad_items,
+            browser = self.launch_browser(
+                p,
+                viewport={"width": 1920, "height": 1080},
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/113.0.0.0 Safari/537.36"
             )
+            page = browser.new_page()
+            
+            # Configurar headers adicionais
+            page.set_extra_http_headers({
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+                "Accept-Encoding": "gzip, deflate, br",
+                "DNT": "1",
+                "Connection": "keep-alive",
+                "Upgrade-Insecure-Requests": "1",
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "none",
+                "Sec-Fetch-User": "?1",
+                "Cache-Control": "max-age=0"
+            })
+            
+            logger.info(f"[{self.name}] Opening URL '{self.url}'...")
+            
+            try:
+                # Tentar carregar a página com timeout maior
+                response = page.goto(self.url, timeout=180_000, wait_until="networkidle")
+                if not response:
+                    logger.error(f"[{self.name}] Failed to load page: no response")
+                    return EntryItem(url=self.url)
+                
+                if response.status >= 400:
+                    logger.error(f"[{self.name}] Failed to load page: status {response.status}")
+                    return EntryItem(url=self.url)
+                
+                # Esperar pelo conteúdo principal com timeout maior
+                selectors = [
+                    "h1.title",                  # Título principal
+                    "h1.article-title",         # Título alternativo
+                    "h1"                        # Fallback
+                ]
+                
+                title_selector = None
+                for selector in selectors:
+                    if page.locator(selector).count() > 0:
+                        title_selector = selector
+                        break
+                
+                if not title_selector:
+                    logger.error(f"[{self.name}] No title element found")
+                    return EntryItem(url=self.url)
+                
+                # Extrair título
+                entry_title = ""
+                try:
+                    entry_title = page.locator(title_selector).first.inner_text().strip()
+                except Exception as e:
+                    logger.warning(f"[{self.name}] Failed to extract title: {str(e)}")
+                
+                # Extrair corpo do texto
+                body = ""
+                try:
+                    body_selectors = [
+                        ".article-content",       # Principal
+                        ".content-article",      # Alternativo
+                        "article"                # Fallback
+                    ]
+                    
+                    for selector in body_selectors:
+                        body_element = page.locator(selector)
+                        if body_element.count() > 0:
+                            body = body_element.first.inner_text().strip()
+                            if body:
+                                break
+                    
+                    if not body:
+                        logger.warning(f"[{self.name}] Extracted body is empty")
+                except Exception as e:
+                    logger.warning(f"[{self.name}] Failed to extract article body: {str(e)}")
+                
+                # Extrair tags
+                tags = []
+                try:
+                    tag_selectors = [
+                        ".article-tags a",      # Principal
+                        ".tags a",             # Alternativo
+                        ".post-tags a"          # Fallback
+                    ]
+                    
+                    for selector in tag_selectors:
+                        tag_elements = page.locator(selector)
+                        if tag_elements.count() > 0:
+                            for i in range(tag_elements.count()):
+                                tag_text = tag_elements.nth(i).inner_text().strip()
+                                if tag_text and tag_text not in tags:
+                                    tags.append(tag_text)
+                            if tags:
+                                break
+                except Exception as e:
+                    logger.warning(f"[{self.name}] Failed to extract tags: {e}")
+                
+                return EntryItem(
+                    title=entry_title,
+                    url=self.url,
+                    description="",  # No description needed
+                    body=body,
+                    tags=tags,
+                )
+                
+            except Exception as e:
+                logger.error(f"[{self.name}] Failed to process page: {str(e)}")
+                return EntryItem(url=self.url)

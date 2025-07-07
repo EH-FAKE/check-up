@@ -1,24 +1,18 @@
-import os
 import argparse
+import json
+import os
 import sched
 import time
 import traceback
-import json
 from datetime import datetime
 
 from decouple import config
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session
 from minio import Minio
+from models import Advertisement, Entry, Portal, URLQueue, create_instance
 from plays.base import BasePlay
 from plog import logger
-from models import (
-    Advertisement,
-    Entry,
-    Portal,
-    URLQueue,
-    create_instance,
-)
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session
 
 # ── Parse target platform (domain) via CLI or env ──────────────────────────
 parser = argparse.ArgumentParser(
@@ -49,24 +43,24 @@ def get_minio_client():
     access_key = config("MINIO_ACCESS_KEY")
     secret_key = config("MINIO_SECRET_KEY")
     secure = config("MINIO_SECURE", cast=bool)
-    
+
     logger.info(f"Initializing MinIO client with endpoint: {endpoint}")
     logger.info(f"MinIO secure mode: {secure}")
-    
+
     client = Minio(
         endpoint,
         access_key=access_key,
         secret_key=secret_key,
         secure=secure
     )
-    
+
     try:
         client.list_buckets()
         logger.info("Successfully connected to MinIO server")
     except Exception as e:
         logger.error(f"Failed to connect to MinIO server: {e}")
         raise
-    
+
     return client
 
 
@@ -104,7 +98,7 @@ def main():
     # Setup clients
     minio_client = get_minio_client()
     bucket_name = config("MINIO_BUCKET", default="scraped-articles")
-    
+
     # Setup database connection
     db_url = config("DATABASE_URL")
     if "postgressql" in db_url:
@@ -118,20 +112,22 @@ def main():
     queue_urls = URLQueue.created(session) \
         .filter(URLQueue.url.like(f"%{TARGET_DOMAIN}%")) \
         .all()
-    
+
     if not queue_urls:
         logger.info(f"No pending URLs for '{TARGET_DOMAIN}' in queue")
         session.close()
         return
 
-    logger.info(f"Found {len(queue_urls)} URLs for '{TARGET_DOMAIN}' to process")
+    logger.info(
+        f"Found {len(queue_urls)} URLs for '{TARGET_DOMAIN}' to process")
 
     for url_obj in queue_urls:
         logger.info(f"Processing URL '{url_obj.url}' from queue...")
         url_obj.set_as_started(session)
 
         try:
-            scraper = BasePlay.get_scraper(url_obj.url, headless=config("HEADLESS", cast=bool))
+            scraper = BasePlay.get_scraper(
+                url_obj.url, headless=config("HEADLESS", cast=bool))
             entry_item = scraper.execute()
         except Exception as exc:
             logger.error(f"Error scraping '{url_obj.url}': {exc!r}")
@@ -143,7 +139,7 @@ def main():
 
         portal = session.query(Portal).filter_by(slug=scraper.name).one()
         logger.info(f"Saving entry '{entry_item.title}'")
-        
+
         entry_params = {
             "portal": portal,
             "url": entry_item.url,
@@ -166,12 +162,12 @@ def main():
             "scraped_at": datetime.utcnow().isoformat(),
             "entry_id": entry.id,
             "ads": [
-                {   "title": ad.title,
+                {"title": ad.title,
                     "url": ad.url,
                     "thumbnail": ad.thumbnail_url,
                     "tag": ad.tag,
                     "excerpt": ad.excerpt
-                }
+                 }
                 for ad in entry_item.ads if ad.is_valid()
             ]
         }
@@ -181,12 +177,13 @@ def main():
 
         try:
             save_to_minio(minio_client, article_data, bucket_name, object_name)
-            
+
             ads = []
             for i, ad_item in enumerate(entry_item.ads, start=1):
                 if not ad_item.is_valid():
                     continue
-                logger.info(f"Saving AD ({i}/{len(entry_item.ads)}): '{ad_item.title}'")
+                logger.info(
+                    f"Saving AD ({i}/{len(entry_item.ads)}): '{ad_item.title}'")
                 ads.append(
                     Advertisement(
                         entry=entry,

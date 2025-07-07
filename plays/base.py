@@ -1,13 +1,18 @@
+import hashlib
 import shutil
 import time
+from pathlib import Path
 from tempfile import NamedTemporaryFile
 from typing import List
+import hashlib
+from pathlib import Path
 
-from playwright.sync_api import TimeoutError as PlayWrightTimeoutError, sync_playwright
+from playwright.sync_api import TimeoutError as PlayWrightTimeoutError
+from playwright.sync_api import sync_playwright
 
+from plays.exceptions import ScraperNotFoundError
 from plays.items import EntryItem
 from plays.timeout import PlayerTimeoutError
-from plays.exceptions import ScraperNotFoundError
 from plog import logger
 
 
@@ -79,6 +84,41 @@ class BasePlay:
             *args,
             **kwargs,
         )
+    def take_screenshot(self, page, url: str, goto: bool = True) -> str:
+        """
+        Tira um screenshot da página atual (ou navega para a URL se `goto=True`)
+        e salva com base no hash da URL.
+        """
+        if goto:
+            page.goto(url)
+
+        url_hash = hashlib.md5(url.encode()).hexdigest()
+        screenshot_dir = Path("./screenshots")
+        screenshot_dir.mkdir(parents=True, exist_ok=True)
+
+        screenshot_path = screenshot_dir / f"{self.name}_{url_hash}.png"
+        page.screenshot(path=str(screenshot_path))
+
+        logger.info(f"[{self.name}] Screenshot saved to {screenshot_path}")
+        return str(screenshot_path)
+
+    def take_screenshot(self, page, url: str, goto: bool = True) -> str:
+        """
+        Tira um screenshot da página atual (ou navega para a URL se `goto=True`)
+        e salva com base no hash da URL.
+        """
+        if goto:
+            page.goto(url)
+
+        url_hash = hashlib.md5(url.encode()).hexdigest()
+        screenshot_dir = Path("./screenshots")
+        screenshot_dir.mkdir(parents=True, exist_ok=True)
+
+        screenshot_path = screenshot_dir / f"{self.name}_{url_hash}.png"
+        page.screenshot(path=str(screenshot_path))
+
+        logger.info(f"[{self.name}] Screenshot saved to {screenshot_path}")
+        return str(screenshot_path)
 
     def remove_session(self):
         if self.allow_remove_session:
@@ -123,7 +163,8 @@ class BasePlay:
                 retries -= 1
 
         if entry_item is None:
-            raise Exception(f"[{self.name}] Failed to scrape content from '{self.url}'")
+            raise Exception(
+                f"[{self.name}] Failed to scrape content from '{self.url}'")
 
         entry_item = self.post_run(entry_item)
         return entry_item

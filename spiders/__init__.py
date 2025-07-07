@@ -11,6 +11,8 @@ from spiders.terra import TerraSpider
 from spiders.uol import UOLSpider
 from spiders.gazetaDoPovo import GazetaDoPovoSpider
 from spiders.imirante import ImiranteSpider
+from spiders.maisGoias import MaisGoiasSpider
+from spiders.aliadosBrasil import AliadosBrasilSpider
 
 __all__ = [
     BaseSpider,
@@ -26,4 +28,6 @@ __all__ = [
     UOLSpider,
     GazetaDoPovoSpider,
     ImiranteSpider,
+    MaisGoiasSpider,
+    AliadosBrasilSpider,
 ]
