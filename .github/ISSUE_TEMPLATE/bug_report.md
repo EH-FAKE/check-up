@@ -1,9 +1,10 @@
 ---
-name: 🐛 Bug Report
+name: "\U0001F41B Bug Report"
 about: Reportar um bug ou problema encontrado no projeto
-title: '[BUG] '
-labels: ['bug']
+title: "[BUG] "
+labels: bug
 assignees: ''
+
 ---
 
 ## 🐛 Descrição do Bug

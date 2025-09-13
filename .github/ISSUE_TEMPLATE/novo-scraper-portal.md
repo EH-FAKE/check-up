@@ -1,9 +1,11 @@
 ---
-name: 🆕 Novo Scraper de Portal
-about: Criar um novo scraper para um portal de notícias que ainda não está presente no projeto
-title: '[NOVO] Portal: [NOME_DO_PORTAL]'
-labels: ['novo', 'scraper', 'portal', 'notícias']
+name: "\U0001F195 Novo Scraper de Portal"
+about: Criar um novo scraper para um portal de notícias que ainda não está presente
+  no projeto
+title: "[NOVO] Portal: [NOME_DO_PORTAL]"
+labels: ''
 assignees: ''
+
 ---
 
 ## 📋 Informações do Portal
