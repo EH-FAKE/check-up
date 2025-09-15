@@ -1,32 +1,40 @@
 *.py[co]
+*.pyc
 *.sw[pno]
 .env
 collections/
 *.warc.*
 sessions/
 logs/
-__pycache__
-/data
-/screenshots
+__pycache__/
+
+# CI/CD Local
+.actrc
+.act/
+
+# Docker e desenvolvimento
+.docker/
+data/
+screenshots/
 
 # Cache directories
 .cache/
 .ipython/
+.pytest_cache/
 
 # Playwright browsers
 ms-playwright/
 
-# Python cache
-*.pyc
-__pycache__/
-.pytest_cache/
-
-# IDEs
+# IDE e editores
 .vscode/
 .idea/
+*.swp
+*.swo
 
-# Docker
-.dockerignore
+# Temporários
+*.tmp
+*.temp
+*.log
 
 # OS
 .DS_Store
