@@ -1,11 +1,11 @@
 blank_issues_enabled: false
 contact_links:
-  - name: 📚 Tutorial de Contribuição
-    url: https://github.com/aosfatos/check-up/blob/develop/TUTORIAL_SPIDERS_PLAYS.md
-    about: Leia o tutorial completo antes de contribuir
-  - name: 💬 Discussões
-    url: https://github.com/aosfatos/check-up/discussions
-    about: Tire dúvidas e discuta ideias com a comunidade
-  - name: 🐛 Bug Report
-    url: https://github.com/aosfatos/check-up/issues/new?template=bug_report.md
-    about: Reporte bugs e problemas encontrados
+  - name: 📚 Documentação do Projeto
+    url: https://eh-fake.github.io/docs/land/index.html
+    about: Leia a documentação completa antes de contribuir
+  - name: 📚 Tutorial de Contribuição com Spiders e Plays existentes
+    url: https://github.com/EH-FAKE/check-up/blob/develop/TUTORIAL_SPIDERS_PLAYS.md
+    about: Leia o tutorial de contribuição com spiders e plays existentes antes de contribuir
+  - name: 📚 Tutorial de Contribuição com novos Spiders e Plays
+    url: https://github.com/EH-FAKE/check-up/blob/develop/TUTORIAL_OUTROS_TESTES.md
+    about: Leia o tutorial de contribuição com novos spiders e plays antes de contribuir
