@@ -1,6 +1,7 @@
 import re
 
 import scrapy
+from scrapy_playwright.page import PageMethod
 
 from spiders.base import BaseSpider
 from spiders.items import URLItem
@@ -24,6 +25,17 @@ class TerraSpider(BaseSpider):
             "Upgrade-Insecure-Requests": "1",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0 Safari/537.36",
         },
+        # Ativa o Playwright para scrollar e carregar conteúdo dinâmico
+        "DOWNLOAD_HANDLERS": {
+            "http": "scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler",
+            "https": "scrapy_playwright.handler.ScrapyPlaywrightDownloadHandler",
+        },
+        "TWISTED_REACTOR": "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
+        "PLAYWRIGHT_BROWSER_TYPE": "firefox",
+        "PLAYWRIGHT_LAUNCH_OPTIONS": {"headless": True},
+        "PLAYWRIGHT_DEFAULT_NAVIGATION_TIMEOUT": 60 * 1000,
+        "PLAYWRIGHT_ABORT_RESOURCE_TYPES": ["image", "media", "font", "stylesheet"],
+        "CONCURRENT_REQUESTS": 4,
     }
     
     #  Seções que não são notícias
@@ -62,15 +74,47 @@ class TerraSpider(BaseSpider):
             return True
         return False
 
+    def _block_ads(self, route, request):
+        try:
+            
+            blocked_domains = (
+                "doubleclick.net",
+                "googlesyndication.com",
+                "google-analytics.com",
+                "analytics.google.com",
+                "clarity.ms",
+                "tailtarget.com",
+                "flashtalking.com",
+                "googletagmanager.com",
+            )
+            if request.resource_type in {"image", "media", "font", "stylesheet"}:
+                return route.abort()
+            if any(d in request.url for d in blocked_domains):
+                return route.abort()
+            return route.continue_()
+        except Exception:
+            return route.continue_()
+
     def start_requests(self):
         for url in self.start_urls:
+            methods = [
+                PageMethod("route", "**/*", self._block_ads),
+                PageMethod("wait_for_load_state", "domcontentloaded"),
+            ]
+            for _ in range(12):
+                methods.append(PageMethod("evaluate", "window.scrollBy(0, document.body.scrollHeight)"))
+                methods.append(PageMethod("wait_for_timeout", 700))
+
             yield scrapy.Request(
                 url,
                 callback=self.parse,
                 dont_filter=True,
-                meta={"dont_redirect": True, "handle_httpstatus_list": [403]},
+                meta={
+                    "playwright": True,
+                    "playwright_page_goto_kwargs": {"wait_until": "domcontentloaded", "timeout": 60_000},
+                    "playwright_page_methods": methods,
+                },
             )
-
     def parse(self, response):
         """
         Extrai apenas URLs da página inicial, sem crawling recursivo
