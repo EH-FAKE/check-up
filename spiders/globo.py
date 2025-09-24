@@ -28,7 +28,7 @@ class GloboSpider(BaseSpider):
     }
 
     BLACKLISTED_SECTIONS = {
-        "videos", "podcast", "podcasts", "blogs", "colunas", "assinante", "clube-o-globo",
+        "videos", "podcast", "podcasts", "blogs", "colunas", "assinante", "clube-o-globo", "guia"
     }
 
     def allow_url(self, url: str) -> bool:
@@ -46,7 +46,7 @@ class GloboSpider(BaseSpider):
         segments_norm = [s.lower() for s in path.strip("/").split("/") if s]
 
         # Blacklist por prefixo em qualquer segmento
-        blacklist_prefixes = {p.lstrip('/').lower() for p in self.BLACKLISTED_SECTIONS}
+        blacklist_prefixes = {p.lstrip('/').lower() for p in self.blacklist}
         for seg in segments_norm:
             if any(seg.startswith(pref) for pref in blacklist_prefixes):
                 return False
