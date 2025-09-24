@@ -79,6 +79,7 @@ class TerraSpider(BaseSpider):
 
 
     def _block_ads(self, route, request):
+        # Bloqueia recursos desnecessários e domínios de anúncios para carregamento mais rápido
         try:
             blocked_domains = (
                 "doubleclick.net",
@@ -128,6 +129,8 @@ class TerraSpider(BaseSpider):
             "a[href*='terra.com.br/economia']",
             "a[href*='terra.com.br/esportes']",
             "a[href*='terra.com.br/vida-e-estilo']",
+            "a[href*='terra.com.br/mobilidade']",
+            "a[href*='terra.com.br/diversao']",
             "a[href*='terra.com.br/']",
         ]
 
