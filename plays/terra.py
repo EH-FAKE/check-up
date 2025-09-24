@@ -1,60 +1,113 @@
-import time
-
 from playwright.sync_api import sync_playwright
 
 from plays.base import BasePlay
-from plays.items import AdItem, EntryItem
-from plays.utils import get_or_none
+from plays.items import EntryItem
 from plog import logger
 
 
 class TerraPlay(BasePlay):
     name = "terra"
-    n_expected_ads = 10
 
     @classmethod
     def match(cls, url):
         return "terra.com.br" in url
-
-    def find_items(self, html_content) -> AdItem:
-        return AdItem(
-            title=get_or_none(r'title="(.*?)"', html_content),
-            url=get_or_none(r'href="(.*?)"', html_content),
-            thumbnail_url=get_or_none(r'url\(&quot;(.*?)&quot;\)', html_content),
-            tag=get_or_none(r'<span class="branding-inner".*?>(.*?)<\/span>', html_content),
-        )
 
     def pre_run(self):
         pass
 
     def run(self) -> EntryItem:
         with sync_playwright() as p:
-            browser = self.launch_browser(p)
+            browser = self.launch_browser(p, viewport={"width": 1600, "height": 1000})
             page = browser.new_page()
             logger.info(f"[{self.name}] Opening URL '{self.url}'...")
             page.goto(self.url, timeout=180_000)
-            logger.info(f"[{self.name}] Searching for ads...")
-            page.locator("#taboola-below-article-thumbnails").scroll_into_view_if_needed()
 
-            entry_screenshot_path = self.take_screenshot(page, self.url, goto=False)
-            entry_title = page.locator("title").inner_text()
-            time.sleep(self.wait_time * 2)
-
-            elements = page.locator(".videoCube")
-            ad_items = []
-            visible_elements = []
-            for i in range(elements.count()):
-                element = elements.nth(i)
-                if not element.is_visible():
+            # Título
+            title = ""
+            for selector in [
+                "h1",
+                ".article-title",
+                ".post-title",
+                ".c-news__title",
+            ]:
+                try:
+                    el = page.locator(selector)
+                    if el.count() > 0:
+                        title = el.first.inner_text().strip()
+                        if title:
+                            logger.info(f"[{self.name}] Title from '{selector}'")
+                            break
+                except Exception:
                     continue
-                visible_elements.append(element)
-                content = element.inner_html()
-                ad_item = self.find_items(content)
-                ad_items.append(ad_item)
+
+            # Descrição
+            description = ""
+            for selector in [
+                "h2",
+                ".article-subtitle",
+                ".c-news__subtitle",
+            ]:
+                try:
+                    el = page.locator(selector)
+                    if el.count() > 0:
+                        description = el.first.inner_text().strip()
+                        if description:
+                            logger.info(f"[{self.name}] Description from '{selector}'")
+                            break
+                except Exception:
+                    continue
+
+            # Corpo da notícia
+            body = ""
+            for selector in [
+                ".article__content--body p, .article__content--body h2",
+                ".article__content--body",       
+                ".article__content",
+                ".content",
+                ".c-news__body",
+            ]:
+                try:
+                    els = page.locator(selector)
+                    count = els.count()
+                    if count > 0:
+                        if count > 1:
+                            parts = []
+                            for i in range(count):
+                                t = els.nth(i).inner_text().strip()
+                                if t:
+                                    parts.append(t)
+                            body = "\n\n".join(parts).strip()
+                        else:
+                            body = els.first.inner_text().strip()
+                        if body and len(body) > 100:
+                            logger.info(f"[{self.name}] Body from '{selector}' (len={len(body)})")
+                            break
+                except Exception:
+                    continue
+
+            # Tags
+            tags = []
+            for selector in [
+                ".t360-tags__list a",
+                ".t360-tags__list"
+            ]:
+                try:
+                    els = page.locator(selector)
+                    if els.count() > 0:
+                        for i in range(els.count()):
+                            t = els.nth(i).inner_text().strip()
+                            if t and t not in tags:
+                                tags.append(t)
+                        if tags:
+                            logger.info(f"[{self.name}] {len(tags)} tags from '{selector}'")
+                            break
+                except Exception:
+                    continue
 
             return EntryItem(
-                title=entry_title,
-                ads=ad_items,
+                title=title,
                 url=self.url,
-                screenshot_path=entry_screenshot_path,
+                description=description,
+                body=body,
+                tags=tags,
             )
