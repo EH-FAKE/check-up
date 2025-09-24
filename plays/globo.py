@@ -1,89 +1,149 @@
-import time
-
-from decouple import config
-from playwright.sync_api import TimeoutError as PlayWrightTimeoutError, sync_playwright
+from playwright.sync_api import sync_playwright
 
 from plays.base import BasePlay
-from plays.items import AdItem, EntryItem
-from plays.utils import get_or_none
+from plays.items import EntryItem
 from plog import logger
 
 
 class GloboPlay(BasePlay):
     name = "globo"
-    n_expected_ads = 50
-
-    def login(self):
-        with sync_playwright() as p:
-            browser = self.launch_browser(p)
-            page = browser.new_page()
-            login_url = "https://login.globo.com/login/"
-            logger.info(f"Opening URL {login_url}...")
-            page.goto(login_url)
-            time.sleep(self.wait_time)
-            page.locator("#barra-item-login").click()
-            page.locator("#login").fill(config("GLOBO_USERNAME"))
-            page.locator("#password").fill(config("GLOBO_PASSWORD"))
-            page.locator("#login-button").click()
 
     @classmethod
     def match(cls, url):
-        return "oglobo.globo.com/" in url
-
-    @classmethod
-    def extra_kwargs(cls):
-        return {"allow_remove_session": False}
-
-    def find_items(self, html_content) -> AdItem:
-        return AdItem(
-            title=get_or_none(r'title="(.*?)"', html_content),
-            url=get_or_none(r'href="(.*?)"', html_content),
-            thumbnail_url=get_or_none(r'url\(&quot;(.*?)&quot;\)', html_content),
-            tag=get_or_none(r'<span class="branding-inner".*?>(.*?)<\/span>', html_content),
-            excerpt=get_or_none(r'slot="description" title="(.*?)"', html_content),
-        )
+        return "oglobo.globo.com" in url
 
     def pre_run(self):
         pass
 
-    def is_logged_in(self, page):
-        try:
-            page.locator(".login-profile__menu").first.inner_html()
-        except PlayWrightTimeoutError:
-            raise Exception(f"[{self.name}] Not logged in!")
-
     def run(self) -> EntryItem:
         with sync_playwright() as p:
-            browser = self.launch_browser(p)
+            browser = self.launch_browser(p, viewport={"width": 1600, "height": 1000})
             page = browser.new_page()
+
+            # Bloquear recursos pesados/ads para acelerar
+            blocked_domains = (
+                "doubleclick.net",
+                "googlesyndication.com",
+                "google-analytics.com",
+                "analytics.google.com",
+                "clarity.ms",
+                "tailtarget.com",
+                "flashtalking.com",
+                "googletagmanager.com",
+            )
+
+            def block_ads(route, request):
+                try:
+                    if request.resource_type in {"image", "media", "font", "stylesheet"}:
+                        return route.abort()
+                    if any(d in request.url for d in blocked_domains):
+                        return route.abort()
+                except Exception:
+                    pass
+                return route.continue_()
+
+            page.route("**/*", block_ads)
+            page.set_default_navigation_timeout(60_000)
+            page.set_default_timeout(15_000)
+
             logger.info(f"[{self.name}] Opening URL '{self.url}'...")
-            page.goto(self.url, timeout=180_000)
-            logger.info(f"[{self.name}] Searching for ads...")
+            page.goto(self.url, timeout=60_000, wait_until="domcontentloaded")
+            # Sincroniza com o conteúdo principal sem esperar recursos de terceiros
+            try:
+                page.wait_for_selector("h1", timeout=15_000)
+            except Exception:
+                pass
 
-            self.is_logged_in(page)
-
-            page.locator(".tbl-feed-header-text").scroll_into_view_if_needed()
-            self.scroll_down(page, 40, 400, wait_time=1)
-            page.locator("#boxComentarios").scroll_into_view_if_needed()
-
-            entry_screenshot_path = self.take_screenshot(page, self.url, goto=False, timeout=60_000)
-            entry_title = page.locator("title").inner_text()
-
-            elements = page.locator(".videoCube")
-            ad_items = []
-            visible_elements = []
-            for i in range(elements.count()):
-                element = elements.nth(i)
-                if not element.is_visible():
+            # Título
+            title = ""
+            for selector in [
+                ".content-head__title",
+                ".title h1",
+                "h1",
+            ]:
+                try:
+                    el = page.locator(selector)
+                    if el.count() > 0:
+                        title = el.first.inner_text().strip()
+                        if title:
+                            logger.info(f"[{self.name}] Title from '{selector}'")
+                            break
+                except Exception:
                     continue
-                visible_elements.append(element)
-                content = element.inner_html()
-                ad_item = self.find_items(content)
-                ad_items.append(ad_item)
+            if not title:
+                try:
+                    title = page.title().strip()
+                except Exception:
+                    title = ""
+
+            # Descrição
+            description = ""
+            for selector in [
+                "content-head__subtitle",
+                ".subtitle h2",
+                "h2"
+            ]:
+                try:
+                    el = page.locator(selector)
+                    if el.count() > 0:
+                        description = el.first.inner_text().strip()
+                        if description:
+                            logger.info(f"[{self.name}] Description from '{selector}'")
+                            break
+                except Exception:
+                    continue
+
+            if not description:
+                description = "-"
+
+            # Corpo da notícia
+            body = ""
+            for selector in [
+                "article .content-text__container",
+                "article .content-text p",
+            ]:
+                try:
+                    els = page.locator(selector)
+                    count = els.count()
+                    if count > 0:
+                        if count > 1:
+                            parts = []
+                            for i in range(count):
+                                t = els.nth(i).inner_text().strip()
+                                if t:
+                                    parts.append(t)
+                            body = "\n\n".join(parts).strip()
+                        else:
+                            body = els.first.inner_text().strip()
+                        if body and len(body) > 100:
+                            logger.info(f"[{self.name}] Body from '{selector}' (len={len(body)})")
+                            break
+                except Exception:
+                    continue
+
+            # Tags
+            tags = []
+            for selector in [
+                ".entities__list-item a",
+                ".entities__list li a"
+            ]:
+                try:
+                    els = page.locator(selector)
+                    if els.count() > 0:
+                        for i in range(els.count()):
+                            t = els.nth(i).inner_text().strip()
+                            if t and t not in tags:
+                                tags.append(t)
+                        if tags:
+                            logger.info(f"[{self.name}] {len(tags)} tags from '{selector}'")
+                            break
+                except Exception:
+                    continue
 
             return EntryItem(
-                title=entry_title,
-                ads=ad_items,
+                title=title,
                 url=self.url,
-                screenshot_path=entry_screenshot_path,
+                description=description,
+                body=body,
+                tags=tags,
             )
