@@ -1,0 +1,255 @@
+name: Scraper Health Monitor
+
+on:
+  schedule:
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+
+jobs:
+  monitor-scrapers:
+    name: Monitor Scraper Health
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pipenv
+          pipenv install --dev --system
+
+      - name: Test Individual Scrapers
+        id: scraper-test
+        run: |
+          echo "FAILED_SCRAPERS=" >> $GITHUB_OUTPUT
+
+          portals=("uol" "globo" "folha" "estadao" "veja" "r7" "ig" "terra" "metropoles")
+          failed_portals=""
+
+          for portal in "${portals[@]}"; do
+            echo "Testing $portal..."
+            
+            if ! python -c "
+          import sys
+          sys.path.append('.')
+          try:
+              exec(f'from spiders.{portal.replace(\"-\", \"\")} import *')
+              print(f'{portal} spider import: OK')
+          except Exception as e:
+              print(f'{portal} spider import: FAILED - {e}')
+              sys.exit(1)
+          try:
+              exec(f'from plays.{portal.replace(\"-\", \"\")} import *')  
+              print(f'{portal} play import: OK')
+          except Exception as e:
+              print(f'{portal} play import: FAILED - {e}')
+              sys.exit(1)
+          " 2>/dev/null; then
+              echo "$portal: ❌ FAILED"
+              if [ -n "$failed_portals" ]; then
+                failed_portals="$failed_portals,$portal"
+              else
+                failed_portals="$portal"
+              fi
+            else
+              echo "$portal: ✅ OK"
+            fi
+          done
+
+          echo "FAILED_SCRAPERS=$failed_portals" >> $GITHUB_OUTPUT
+          echo "Failed scrapers: $failed_portals"
+
+      - name: Create Issues for Failed Scrapers
+        if: steps.scraper-test.outputs.FAILED_SCRAPERS != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const failedScrapers = '${{ steps.scraper-test.outputs.FAILED_SCRAPERS }}';
+
+            if (!failedScrapers) return;
+
+            const scrapers = failedScrapers.split(',').filter(s => s.trim());
+
+            for (const scraper of scrapers) {
+              const portalName = scraper.charAt(0).toUpperCase() + scraper.slice(1);
+              
+              // Verificar se já existe issue aberta para este scraper
+              const existingIssues = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                labels: 'scraper,portal,automated,bug',
+                state: 'open'
+              });
+              
+              const existingIssue = existingIssues.data.find(issue => 
+                issue.title.toLowerCase().includes(scraper.toLowerCase()) &&
+                issue.body.includes('Health Check Failed')
+              );
+              
+              const currentDate = new Date().toLocaleString('pt-BR', {
+                timeZone: 'America/Sao_Paulo',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+              });
+              
+              if (existingIssue) {
+                const comment = `## 🔄 Falha Recorrente Detectada
+
+            **Data/Hora**: ${currentDate}  
+            **Status**: Scraper ainda falhando no health check
+
+            O scraper do **${portalName}** continua apresentando problemas. Requer atenção urgente.
+
+            ---
+
+            *Update automático do monitor de scrapers*`;
+
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: existingIssue.number,
+                  body: comment
+                });
+                
+                console.log(`Updated existing issue for ${scraper} #${existingIssue.number}`);
+                
+              } else {
+                const issueTitle = `[SCRAPER] Falha no Scraper - ${portalName}`;
+                const issueBody = `## 🚨 Health Check Failed - ${portalName}
+
+            **Portal**: ${portalName}  
+            **Data/Hora**: ${currentDate}  
+            **Tipo**: Falha na importação de spider/play
+
+            ## 📋 Problema Detectado
+
+            O monitor automático de scrapers detectou falhas no scraper do **${portalName}**. O scraper não pode ser importado corretamente, indicando possíveis problemas de:
+
+            - [ ] **Sintaxe**: Erro de sintaxe no código Python
+            - [ ] **Imports**: Dependências faltando ou imports incorretos  
+            - [ ] **Estrutura**: Problemas na estrutura de classes do spider/play
+            - [ ] **Configuração**: Parâmetros de configuração incorretos
+
+            ## 🔧 Arquivos Relacionados
+
+            - \`spiders/${scraper.replace('-', '')}.py\`
+            - \`plays/${scraper.replace('-', '')}.py\`
+
+            ## 🛠️ Como Investigar
+
+            1. **Teste local**:
+               \`\`\`bash
+               python -c "from spiders.${scraper.replace('-', '')} import *"
+               python -c "from plays.${scraper.replace('-', '')} import *"
+               \`\`\`
+
+            2. **Execute o scraper**:
+               \`\`\`bash
+               python scrape.py --spider ${scraper}
+               \`\`\`
+
+            3. **Verifique os logs** para mensagens de erro específicas
+
+            ## 🎯 Portal: ${portalName}
+
+            - **Site**: Adicione URLs de exemplo do portal aqui
+            - **Última atualização conhecida**: Verifique quando foi a última modificação
+            - **Problemas conhecidos**: Documente problemas recorrentes
+
+            ## 📚 Recursos Úteis
+
+            - [Tutorial de Spiders e Plays](https://github.com/aosfatos/check-up/blob/main/TUTORIAL_SPIDERS_PLAYS.md)
+            - [Template de Adaptação](https://github.com/aosfatos/check-up/blob/main/.github/ISSUE_TEMPLATE/adaptar-scraper-existente.md)
+
+            ---
+
+            *Esta issue foi criada automaticamente pelo monitor de scrapers. Quando o scraper for corrigido, esta issue será fechada automaticamente no próximo health check.*`;
+
+                const newIssue = await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title: issueTitle,
+                  body: issueBody,
+                  labels: ['scraper', 'portal', 'bug', 'automated', 'high-priority']
+                });
+                
+                console.log(`Created new scraper failure issue for ${scraper} #${newIssue.data.number}`);
+              }
+            }
+
+      - name: Close Resolved Scraper Issues
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const failedScrapers = '${{ steps.scraper-test.outputs.FAILED_SCRAPERS }}';
+            const failedList = failedScrapers ? failedScrapers.split(',').filter(s => s.trim()) : [];
+
+            const openIssues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'scraper,automated,bug',
+              state: 'open'
+            });
+
+            const scraperIssues = openIssues.data.filter(issue => 
+              issue.body.includes('Health Check Failed')
+            );
+
+            for (const issue of scraperIssues) {
+              const titleMatch = issue.title.match(/\[SCRAPER\] Falha no Scraper - (.+)/);
+              if (!titleMatch) continue;
+              
+              const scraperName = titleMatch[1].toLowerCase();
+              const isStillFailing = failedList.some(failed => 
+                scraperName.includes(failed) || failed.includes(scraperName)
+              );
+              
+              if (!isStillFailing) {
+                const currentDate = new Date().toLocaleString('pt-BR', {
+                  timeZone: 'America/Sao_Paulo',
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                });
+                
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  body: `## ✅ Scraper Recuperado
+
+            **Data/Hora**: ${currentDate}  
+            **Status**: Health check passou com sucesso
+
+            O scraper está funcionando normalmente novamente! Esta issue está sendo fechada automaticamente.
+
+            ---
+
+            *Fechamento automático pelo monitor de scrapers.*`
+                });
+                
+                await github.rest.issues.update({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issue.number,
+                  state: 'closed'
+                });
+                
+                console.log(`Closed resolved scraper issue #${issue.number}`);
+              }
+            }
