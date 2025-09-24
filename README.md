@@ -62,6 +62,7 @@ make crawl_maisgoias    # Portal MaisGoiás
 make crawl_aliadosBrasil # Portal AliadosBrasil
 make crawl_ig           # Portal IG
 make crawl_folha        # Portal Folha
+make crawl_rbs          # Portal RBS
 ```
 
 **📰 Etapa 2: Scraping (Extração de Conteúdo das Notícias)**
@@ -81,6 +82,7 @@ make scrape_veja           # Extração da Veja
 make scrape_r7             # Extração do R7
 make scrape_uol            # Extração do UOL
 make scrape_folha          # Extração da Folha
+make scrape_rbs            # Extração do RBS
 ```
 
 ### 📋 Conteúdo Extraído

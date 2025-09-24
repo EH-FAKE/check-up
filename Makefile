@@ -82,6 +82,9 @@ scrape_uol:
 
 scrape_folha:
 	docker compose exec scraper python scrape_no_openai.py --platform folha.uol.com.br
+
+scrape_rbs:
+	docker compose exec scraper python scrape_no_openai.py --platform clicrbs.com.br
 	
 # Crawler para todos os portais ou específicos
 crawl:
@@ -111,6 +114,9 @@ crawl_ig:
 
 crawl_folha:
 	docker compose run scraper python crawl.py folhaspider
+
+crawl_rbs:
+	docker compose run scraper python crawl.py rbsspider
 
 # Workflow completo de coleta de URLs
 crawl_all_working:
