@@ -57,10 +57,11 @@ class TerraPlay(BasePlay):
             # Título
             title = ""
             for selector in [
-                "h1",
-                ".article-title",
-                ".post-title",
-                ".c-news__title",
+                ".article__header__headline h1",
+                ".article__header__headline",
+                ".special-article__header--headline h1",
+                ".special-article__header--headline",
+                "h1"
             ]:
                 try:
                     el = page.locator(selector)
@@ -80,9 +81,10 @@ class TerraPlay(BasePlay):
             # Descrição
             description = ""
             for selector in [
-                "h2",
-                ".article-subtitle",
-                ".c-news__subtitle",
+                ".article__header__subtitle h2",
+                ".article__header__subtitle",
+                ".special-article__header--subtitle h2",
+                ".special-article__header--subtitle",    
             ]:
                 try:
                     el = page.locator(selector)
@@ -94,6 +96,9 @@ class TerraPlay(BasePlay):
                 except Exception:
                     continue
 
+            if not description:
+                description = "-"
+
             # Corpo da notícia
             body = ""
             for selector in [
@@ -103,8 +108,6 @@ class TerraPlay(BasePlay):
                 ".special-article__content--body p, .special-article__content--body h2",
                 ".special-article__content--body",
                 ".special-article__content",
-                ".content",
-                ".c-news__body",
             ]:
                 try:
                     els = page.locator(selector)

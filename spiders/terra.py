@@ -41,7 +41,7 @@ class TerraSpider(BaseSpider):
     #  Seções que não são notícias
     BLACKLISTED_SECTIONS = {
         "videos", "podcast", "podcasts", "blogs", "colunas", "especiais",
-        "ao-vivo", "story", "amp", "apostas", "parceiros", "avisolegal"
+        "ao-vivo", "story", "amp", "apostas", "parceiros", "avisolegal", "horoscopo", "degusta",
     }
 
     def allow_url(self, url: str) -> bool:
@@ -59,9 +59,13 @@ class TerraSpider(BaseSpider):
         
         # Evita áreas que não são notícias
         path = re.sub(r"https?://[^/]+", "", url)
-        first = (path.strip("/").split("/") or [""])[0]
-        if first in self.BLACKLISTED_SECTIONS:
-            return False
+        segments_norm = [s.lower() for s in path.strip("/").split("/") if s]
+        
+        # Ignora se QUALQUER segmento começar com algum prefixo da blacklist
+        blacklist_prefixes = {p.lstrip('/').lower() for p in self.BLACKLISTED_SECTIONS}
+        for seg in segments_norm:
+            if any(seg.startswith(pref) for pref in blacklist_prefixes):
+                return False
         
         # Require pelo menos dois segmentos (seção + slug da notícia)
         segments = [s for s in path.split('/') if s]
@@ -76,7 +80,6 @@ class TerraSpider(BaseSpider):
 
     def _block_ads(self, route, request):
         try:
-            
             blocked_domains = (
                 "doubleclick.net",
                 "googlesyndication.com",
