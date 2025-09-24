@@ -1,0 +1,251 @@
+name: Issue and PR Automation
+
+on:
+  issues:
+    types: [opened, edited]
+  pull_request:
+    types: [opened, edited, synchronize]
+
+jobs:
+  auto-label-and-validate:
+    name: Auto Label and Validate
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      pull-requests: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Auto Label Issues
+        if: github.event_name == 'issues'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const title = issue.title.toLowerCase();
+            const body = issue.body || '';
+            const bodyLower = body.toLowerCase();
+
+            let labelsToAdd = [];
+
+            // Detectar tipo de template baseado no título e conteúdo
+            if (title.includes('[docs]') || bodyLower.includes('documentação') || bodyLower.includes('tutorial')) {
+              labelsToAdd.push('documentação');
+              if (bodyLower.includes('tutorial')) {
+                labelsToAdd.push('tutorial');
+              }
+            }
+
+            if (title.includes('[feat]') || bodyLower.includes('nova funcionalidade') || bodyLower.includes('feature')) {
+              labelsToAdd.push('feature');
+              if (bodyLower.includes('arquitetura')) {
+                labelsToAdd.push('arquitetura');
+              }
+            }
+
+            if (title.includes('[bug]') || bodyLower.includes('bug') || bodyLower.includes('erro') || bodyLower.includes('falha')) {
+              labelsToAdd.push('bug');
+            }
+
+            if (bodyLower.includes('scraper') || bodyLower.includes('spider') || bodyLower.includes('play')) {
+              labelsToAdd.push('scraper');
+              
+              // Detectar se é novo ou adaptação
+              if (bodyLower.includes('novo portal') || bodyLower.includes('criar') || bodyLower.includes('adicionar')) {
+                labelsToAdd.push('novo');
+              }
+              if (bodyLower.includes('adaptar') || bodyLower.includes('atualizar') || bodyLower.includes('modificar')) {
+                labelsToAdd.push('adaptação');
+              }
+            }
+
+            // Detectar portais específicos
+            const portals = ['uol', 'globo', 'folha', 'estadao', 'veja', 'r7', 'ig', 'terra', 'metropoles', 'gazeta'];
+            for (const portal of portals) {
+              if (bodyLower.includes(portal)) {
+                labelsToAdd.push('portal');
+                break;
+              }
+            }
+
+            if (bodyLower.includes('notícias') || bodyLower.includes('noticias') || bodyLower.includes('conteúdo')) {
+              labelsToAdd.push('notícias');
+            }
+
+            // Aplicar labels se encontrados
+            if (labelsToAdd.length > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                labels: labelsToAdd
+              });
+              
+              console.log(`Applied labels: ${labelsToAdd.join(', ')}`);
+            }
+
+      - name: Auto Label PRs
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const title = pr.title.toLowerCase();
+            const body = pr.body || '';
+            const bodyLower = body.toLowerCase();
+
+            let labelsToAdd = [];
+
+            // Buscar arquivos modificados
+            const files = await github.rest.pulls.listFiles({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number
+            });
+
+            const changedFiles = files.data.map(file => file.filename);
+            console.log('Changed files:', changedFiles);
+
+            // Labels baseados em arquivos modificados
+            if (changedFiles.some(f => f.startsWith('web/client/'))) {
+              labelsToAdd.push('frontend');
+            }
+
+            if (changedFiles.some(f => f.startsWith('web/server/'))) {
+              labelsToAdd.push('backend');
+            }
+
+            if (changedFiles.some(f => f.includes('spiders/') || f.includes('plays/'))) {
+              labelsToAdd.push('scraper');
+            }
+
+            if (changedFiles.some(f => f.includes('.md') || f.includes('README'))) {
+              labelsToAdd.push('documentação');
+            }
+
+            if (changedFiles.some(f => f.includes('Dockerfile') || f.includes('docker') || f.includes('.yml'))) {
+              labelsToAdd.push('infraestrutura');
+            }
+
+            if (changedFiles.some(f => f.includes('test') || f.includes('spec'))) {
+              labelsToAdd.push('testes');
+            }
+
+            // Labels baseados no título/conteúdo
+            if (title.includes('feat') || title.includes('add') || bodyLower.includes('nova funcionalidade')) {
+              labelsToAdd.push('feature');
+            }
+
+            if (title.includes('fix') || title.includes('bug') || bodyLower.includes('correção')) {
+              labelsToAdd.push('bug');
+            }
+
+            if (title.includes('docs') || bodyLower.includes('documentação')) {
+              labelsToAdd.push('documentação');
+            }
+
+            // Aplicar labels se encontrados
+            if (labelsToAdd.length > 0) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr.number,
+                labels: labelsToAdd
+              });
+              
+              console.log(`Applied labels: ${labelsToAdd.join(', ')}`);
+            }
+
+      - name: Validate Issue Template
+        if: github.event_name == 'issues'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const body = issue.body || '';
+            const title = issue.title;
+
+            let validationErrors = [];
+            let suggestions = [];
+
+            // Verificar se título segue padrão de template
+            const titlePatterns = [
+              /^\[DOCS\]:/i,
+              /^\[FEAT\]:/i,
+              /^\[BUG\]:/i,
+              /^\[SCRAPER\]:/i,
+              /^\[ADAPT\]:/i
+            ];
+
+            const hasValidTitle = titlePatterns.some(pattern => pattern.test(title));
+
+            if (!hasValidTitle && !title.toLowerCase().includes('portal')) {
+              suggestions.push('💡 **Dica**: Use um dos prefixos no título: `[DOCS]:`, `[FEAT]:`, `[BUG]:`, `[SCRAPER]:` ou `[ADAPT]:`');
+            }
+
+            // Verificar campos obrigatórios baseados no tipo
+            if (title.toLowerCase().includes('[docs]')) {
+              if (!body.includes('Tipo de Documentação') && !body.includes('## 📋 Descrição')) {
+                validationErrors.push('📚 Issue de documentação deve usar o [template de documentação](https://github.com/aosfatos/check-up/issues/new?template=documentacao.md)');
+              }
+            }
+
+            if (title.toLowerCase().includes('[feat]')) {
+              if (!body.includes('Tipo de Proposta') && !body.includes('## 📋 Descrição do Problema')) {
+                validationErrors.push('✨ Issue de feature deve usar o [template de nova funcionalidade](https://github.com/aosfatos/check-up/issues/new?template=nova-feature.md)');
+              }
+            }
+
+            if (title.toLowerCase().includes('[bug]')) {
+              if (!body.includes('Passos para Reproduzir') && !body.includes('## 📋 Descrição do Bug')) {
+                validationErrors.push('🐛 Issue de bug deve usar o [template de bug report](https://github.com/aosfatos/check-up/issues/new?template=bug_report.md)');
+              }
+            }
+
+            if (title.toLowerCase().includes('portal') || body.toLowerCase().includes('scraper')) {
+              if (!body.includes('Portal Alvo') && !body.includes('URLs de Exemplo')) {
+                suggestions.push('🔧 Para scrapers, considere usar o [template de novo portal](https://github.com/aosfatos/check-up/issues/new?template=novo-scraper-portal.md) ou [adaptação](https://github.com/aosfatos/check-up/issues/new?template=adaptar-scraper-existente.md)');
+              }
+            }
+
+            // Verificar descrição muito curta
+            if (body.length < 50) {
+              validationErrors.push('📝 Descrição muito curta. Por favor, forneça mais detalhes sobre sua solicitação.');
+            }
+
+            // Criar comentário se houver problemas ou sugestões
+            if (validationErrors.length > 0 || suggestions.length > 0) {
+              let comment = '## 🤖 Validação Automática de Template\n\n';
+              
+              if (validationErrors.length > 0) {
+                comment += '### ❌ Problemas encontrados:\n\n';
+                validationErrors.forEach(error => {
+                  comment += `- ${error}\n`;
+                });
+                comment += '\n';
+              }
+              
+              if (suggestions.length > 0) {
+                comment += '### 💡 Sugestões de melhoria:\n\n';
+                suggestions.forEach(suggestion => {
+                  comment += `- ${suggestion}\n`;
+                });
+                comment += '\n';
+              }
+              
+              comment += '### 📚 Recursos úteis:\n\n';
+              comment += '- [Templates de Issues](https://github.com/aosfatos/check-up/tree/main/.github/ISSUE_TEMPLATE)\n';
+              comment += '- [Tutorial de Criação do Zero](https://github.com/aosfatos/check-up/blob/main/TUTORIAL_CRIACAO_DO_ZERO.md)\n';
+              comment += '- [Tutorial de Spiders e Plays](https://github.com/aosfatos/check-up/blob/main/TUTORIAL_SPIDERS_PLAYS.md)\n\n';
+              comment += '*Este comentário foi gerado automaticamente. Se você acredita que há um erro, ignore esta mensagem.*';
+              
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: comment
+              });
+            }

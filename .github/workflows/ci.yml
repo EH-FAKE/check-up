@@ -2,9 +2,12 @@ name: Check-up CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
+
+env:
+  CI_FAILURE_LABEL: "ci-failure"
 
 jobs:
   lint:
@@ -17,7 +20,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - name: Install dependencies
         run: |
@@ -46,7 +49,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - name: Install flake8
         run: pip install flake8
@@ -79,7 +82,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
 
       - name: Install pnpm
         run: npm install -g pnpm@latest
@@ -129,7 +132,7 @@ jobs:
       - name: Setup Python Environment
         uses: actions/setup-python@v4
         with:
-          python-version: '3.12'
+          python-version: "3.12"
 
       - name: Install dependencies
         run: |
@@ -154,7 +157,7 @@ jobs:
           echo "MINIO_ACCESS_KEY=minioadmin" >> .env
           echo "MINIO_SECRET_KEY=minioadmin" >> .env
           echo "MINIO_SECURE=False" >> .env
-          
+
           # Patch de configuração temporária para CI
           sed -i.bak 's/healthcheck_db/localhost/g' settings.py
           sed -i.bak 's/healthcheck_minio/localhost/g' settings.py
@@ -216,4 +219,4 @@ jobs:
 
       - name: Test Docker image
         run: |
-          docker run --rm check-up:test python -c "print('Docker image built successfully')" 
+          docker run --rm check-up:test python -c "print('Docker image built successfully')"

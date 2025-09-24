@@ -1,0 +1,207 @@
+name: CI Failure Handler
+
+on:
+  workflow_run:
+    workflows: ["Check-up CI"]
+    types:
+      - completed
+
+jobs:
+  handle-ci-failure:
+    name: Handle CI Failures
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'failure'
+    permissions:
+      issues: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create Issue for CI Failure
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const workflow = context.payload.workflow_run;
+            const branch = workflow.head_branch;
+            const sha = workflow.head_sha;
+            const runUrl = workflow.html_url;
+            const triggeringActor = workflow.triggering_actor?.login || 'unknown';
+
+            // Buscar issues existentes para falhas de CI neste branch
+            const existingIssues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'ci-failure,automated',
+              state: 'open'
+            });
+
+            const existingFailureIssue = existingIssues.data.find(issue => 
+              issue.title.includes(`CI Failure - ${branch}`) || 
+              issue.body.includes(`Branch: \`${branch}\``)
+            );
+
+            const currentDate = new Date().toLocaleString('pt-BR', {
+              timeZone: 'America/Sao_Paulo',
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit'
+            });
+
+            if (existingFailureIssue) {
+              // Atualizar issue existente
+              const comment = `## 🔄 Nova Falha de CI Detectada
+
+            **Data/Hora**: ${currentDate}  
+            **Commit**: \`${sha.substring(0, 7)}\`  
+            **Executado por**: @${triggeringActor}  
+            **Workflow Run**: ${runUrl}
+
+            ---
+
+            Este é um update automático para uma falha de CI recorrente no branch \`${branch}\`.`;
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: existingFailureIssue.number,
+                body: comment
+              });
+              
+              console.log(`Updated existing CI failure issue #${existingFailureIssue.number}`);
+              
+            } else {
+              // Criar nova issue
+              const issueTitle = `[CI] Falha no CI - ${branch}`;
+              const issueBody = `## 🚨 Falha no CI Detectada
+
+            **Branch**: \`${branch}\`  
+            **Data/Hora**: ${currentDate}  
+            **Commit**: \`${sha.substring(0, 7)}\`  
+            **Executado por**: @${triggeringActor}  
+            **Workflow Run**: ${runUrl}
+
+            ## 📋 Detalhes
+
+            O workflow de CI falhou automaticamente. Por favor, verifique os logs do workflow para identificar a causa da falha.
+
+            ## 🔍 Possíveis Causas
+
+            - [ ] **Lint errors**: Problemas de formatação ou qualidade de código
+            - [ ] **Testes falhando**: Falhas nos testes unitários ou de integração  
+            - [ ] **Build errors**: Problemas na compilação do frontend ou backend
+            - [ ] **Docker build**: Falhas na construção da imagem Docker
+            - [ ] **Dependências**: Problemas com instalação de dependências
+            - [ ] **Configuração**: Problemas de configuração do ambiente de CI
+
+            ## 🛠️ Próximos Passos
+
+            1. **Verificar logs**: Clique no link do Workflow Run acima
+            2. **Identificar falha**: Encontre qual job/step específico falhou
+            3. **Corrigir localmente**: Reproduza e corrija o problema localmente
+            4. **Testar**: Execute os testes localmente antes de fazer push
+            5. **Commit fix**: Faça commit da correção
+
+            ## 📚 Recursos Úteis
+
+            - [Troubleshooting CI](https://github.com/aosfatos/check-up/blob/main/README.md#troubleshooting)
+            - [Setup Local](https://github.com/aosfatos/check-up/blob/main/README.md#setup)
+            - [Executar Testes](https://github.com/aosfatos/check-up/blob/main/README.md#testes)
+
+            ---
+
+            *Esta issue foi criada automaticamente pelo sistema de CI. Quando o problema for corrigido e o CI passar, esta issue será fechada automaticamente.*`;
+
+              const newIssue = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: issueTitle,
+                body: issueBody,
+                labels: ['ci-failure', 'bug', 'automated', 'high-priority']
+              });
+              
+              console.log(`Created new CI failure issue #${newIssue.data.number}`);
+              
+              // Mencionar o autor do commit se não for um bot
+              if (triggeringActor !== 'dependabot[bot]' && triggeringActor !== 'github-actions[bot]') {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: newIssue.data.number,
+                  body: `@${triggeringActor} O CI falhou no seu último commit. Por favor, verifique os logs e corrija os problemas identificados.`
+                });
+              }
+            }
+
+  close-resolved-failures:
+    name: Close Resolved CI Failures
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
+    permissions:
+      issues: write
+      contents: read
+
+    steps:
+      - name: Close Resolved CI Issues
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const workflow = context.payload.workflow_run;
+            const branch = workflow.head_branch;
+            const sha = workflow.head_sha;
+            const runUrl = workflow.html_url;
+
+            // Buscar issues de falha de CI abertas para este branch
+            const openIssues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'ci-failure,automated',
+              state: 'open'
+            });
+
+            const branchFailureIssues = openIssues.data.filter(issue => 
+              issue.title.includes(`CI Failure - ${branch}`) || 
+              issue.body.includes(`Branch: \`${branch}\``)
+            );
+
+            for (const issue of branchFailureIssues) {
+              const currentDate = new Date().toLocaleString('pt-BR', {
+                timeZone: 'America/Sao_Paulo',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+              });
+              
+              // Comentar que foi resolvido
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: `## ✅ CI Recuperado
+
+            **Data/Hora**: ${currentDate}  
+            **Commit**: \`${sha.substring(0, 7)}\`  
+            **Workflow Run**: ${runUrl}
+
+            O CI passou com sucesso! Esta issue está sendo fechada automaticamente.
+
+            ---
+
+            *Fechamento automático pelo sistema de CI.*`
+              });
+              
+              // Fechar a issue
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed'
+              });
+              
+              console.log(`Closed resolved CI failure issue #${issue.number}`);
+            }
