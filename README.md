@@ -246,8 +246,7 @@ make prune
 docker compose exec --user root scraper bash
 source /usr/src/.venv/bin/activate
 playwright install --with-deps firefox
-python scrape_no_openai.py --platform metropoles.com
-
+python scrape_no_openai.py --platform metropoles.com # Extração do Metrópoles
 ```
 
 ### 💡 Exemplos Práticos
