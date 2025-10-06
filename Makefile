@@ -82,6 +82,9 @@ scrape_uol:
 
 scrape_folha:
 	docker compose exec scraper python scrape_no_openai.py --platform folha.uol.com.br
+
+scrape_rbs:
+	docker compose exec scraper python scrape_no_openai.py --platform clicrbs.com.br
 	
 # Crawler para todos os portais ou específicos
 crawl:
@@ -112,6 +115,9 @@ crawl_ig:
 crawl_folha:
 	docker compose run scraper python crawl.py folhaspider
 
+crawl_rbs:
+	docker compose run scraper python crawl.py rbsspider
+
 # Workflow completo de coleta de URLs
 crawl_all_working:
 	@echo "Executando crawl de todos os portais funcionais..."
@@ -123,6 +129,7 @@ crawl_all_working:
 	@make crawl_aliadosBrasil
 	@make crawl_ig
 	@make crawl_folha
+	@make crawl_rbs
 	@echo "Crawl de todos os portais concluído!"
 
 # Workflow completo de scraping
@@ -136,6 +143,7 @@ scrape_all_working:
 	@make scrape_r7
 	@make scrape_uol
 	@make scrape_folha
+	@make scrape_rbs
 	@echo "Scraping de todos os portais concluído!"
 
 # Pipeline completo: crawl + scrape
@@ -182,6 +190,7 @@ help:
 	@echo "  make crawl_aliadosBrasil - Coleta URLs do portal AliadosBrasil"
 	@echo "  make crawl_ig          - Coleta URLs do portal IG"
 	@echo "  make crawl_folha       - Coleta URLs do portal Folha"
+	@echo "  make crawl_rbs         - Coleta URLs do portal RBS"
 	@echo ""
 	@echo "=== COMANDOS DE SCRAPING (Extração de Anúncios) ==="
 	@echo "  make scrape_all_working - Executa scraping de todos os portais funcionais"
@@ -193,6 +202,7 @@ help:
 	@echo "  make scrape_r7          - Scraping do portal R7"
 	@echo "  make scrape_uol         - Scraping do portal UOL"
 	@echo "  make scrape_folha       - Scraping do portal Folha"
+	@echo "  make scrape_rbs         - Scraping do portal RBS"
 	@echo ""
 	@echo "=== WORKFLOWS COMPLETOS ==="
 	@echo "  make pipeline_complete  - Executa crawl + scraping de todos os portais"
