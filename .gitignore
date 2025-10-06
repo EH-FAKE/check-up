@@ -31,3 +31,4 @@ __pycache__/
 # OS
 .DS_Store
 Thumbs.db
+web/client/package-lock.json

@@ -43,6 +43,7 @@ const Home = () => {
     );
     const [busca, setBusca] = useState("");
     const [noticias, setNoticias] = useState<any[]>([]);
+    const [todasAsNoticiasDoPortal, setTodasAsNoticiasDoPortal] = useState<any[]>([]);
     const [carregandoNoticias, setCarregandoNoticias] = useState(false);
     const [erroNoticias, setErroNoticias] = useState("");
     const [pagina, setPagina] = useState(1);
@@ -50,6 +51,7 @@ const Home = () => {
     const [noticiaSelecionada, setNoticiaSelecionada] = useState<any | null>(null);
     const [dialogAberto, setDialogAberto] = useState(false);
     const [noticiasPorPortal, setNoticiasPorPortal] = useState<Record<string, number>>({});
+    const [topTags, setTopTags] = useState<string[]>([]);
 
     useEffect(() => {
         fetch(`${API_URL}/portais`)
@@ -60,31 +62,55 @@ const Home = () => {
     }, []);
 
     useEffect(() => {
-        setPagina(1); // Sempre volta para a primeira página ao trocar portal ou busca
+        setPagina(1); 
     }, [portalSelecionado, busca]);
 
     useEffect(() => {
         if (!portalSelecionado) return;
-        setCarregandoNoticias(true);
-        setErroNoticias("");
-        const url = busca.trim()
-            ? `${API_URL}/noticias/${portalSelecionado}/search?q=${encodeURIComponent(busca)}`
-            : `${API_URL}/noticias/${portalSelecionado}`;
-        fetch(url)
-            .then((res) => res.json())
-            .then(setNoticias)
-            .catch(() => setErroNoticias("Erro ao buscar notícias"))
-            .finally(() => setCarregandoNoticias(false));
+
+        if (!busca.trim()) {
+            setCarregandoNoticias(true);
+            setErroNoticias("");
+            fetch(`${API_URL}/noticias/${portalSelecionado}`)
+                .then((res) => res.json())
+                .then((data) => {
+                    setNoticias(data);
+                    setTodasAsNoticiasDoPortal(data);
+                })
+                .catch(() => setErroNoticias("Erro ao buscar notícias"))
+                .finally(() => setCarregandoNoticias(false));
+        } else {
+            setCarregandoNoticias(true);
+            setErroNoticias("");
+            const url = `${API_URL}/noticias/${portalSelecionado}/search?q=${encodeURIComponent(busca)}`;
+            fetch(url)
+                .then((res) => res.json())
+                .then(setNoticias)
+                .catch(() => setErroNoticias("Erro ao buscar notícias"))
+                .finally(() => setCarregandoNoticias(false));
+        }
     }, [portalSelecionado, busca]);
 
-    // Paginação no frontend
+    useEffect(() => {
+        if (todasAsNoticiasDoPortal.length > 0) {
+            const allTags = todasAsNoticiasDoPortal.flatMap(noticia => noticia.tags || []);
+            const tagCounts = allTags.reduce((acc, tag) => {
+                acc[tag] = (acc[tag] || 0) + 1;
+                return acc;
+            }, {} as Record<string, number>);
+            const sortedTags = Object.keys(tagCounts).sort((a, b) => tagCounts[b] - tagCounts[a]);
+            setTopTags(sortedTags.slice(0, 30));
+        } else {
+            setTopTags([]);
+        }
+    }, [todasAsNoticiasDoPortal]);
+
     const totalPaginas = Math.ceil(noticias.length / noticiasPorPagina);
     const inicio = (pagina - 1) * noticiasPorPagina;
     const fim = inicio + noticiasPorPagina;
     const noticiasPaginadas = noticias.slice(inicio, fim);
 
     useEffect(() => {
-        // Buscar contagem de notícias para cada portal
         const buscarContagemNoticias = async () => {
             const contagem: Record<string, number> = {};
             for (const portal of portais) {
@@ -104,13 +130,20 @@ const Home = () => {
         }
     }, [portais]);
 
+    const handleTagClick = (tag: string) => {
+        setBusca(tag);
+    };
+    const handlePortalChange = (novoPortal: string) => {
+        setPortalSelecionado(novoPortal);
+        setBusca(""); 
+    };
+
     if (loading) return (
         <div className="max-w-2xl mx-auto p-8">
             <h1 className="text-2xl font-bold mb-4">
                 Selecione um portal de notícias
             </h1>
             <div className="space-y-6">
-                {/* Skeleton das Tabs  */}
                 <div className="mx-auto flex w-full max-w-4xl bg-gray-200 rounded-md mb-6">
                     {Array.from({ length: 4 }, (_, idx) => (
                         <div key={idx} className="group flex-1 flex items-center justify-center gap-2 p-3 text-xs">
@@ -120,7 +153,6 @@ const Home = () => {
                         </div>
                     ))}
                 </div>
-                {/* Skeleton do conteúdo */}
                 <div className="space-y-4">
                     <Skeleton className="h-4 w-48" />
                     <Skeleton className="h-10 w-full" />
@@ -147,15 +179,14 @@ const Home = () => {
     if (erro) return <div className="p-8 text-red-500">{erro}</div>;
 
     return (
-        <div className="max-w-2xl mx-auto p-8">
+        <div className="max-w-5xl mx-auto p-8">
             <h1 className="text-2xl font-bold mb-4">
                 Selecione um portal de notícias
             </h1>
             {portais.length > 0 && (
-                <Tabs value={portalSelecionado ?? undefined} onValueChange={setPortalSelecionado} className="w-full">
+                <Tabs value={portalSelecionado ?? undefined} onValueChange={handlePortalChange} className="w-full">
                     <TabsList className="mx-auto flex w-full max-w-4xl bg-transparent mb-6 h-auto ">
                         {portais.map((portal) => {
-                            //console.log(`[Debug] Portal: "${portal}", Caminho do Ícone: "${portalIcons[portal]}"`);
                             return (
                                 <TabsTrigger
                                     key={portal}
@@ -184,16 +215,37 @@ const Home = () => {
                             <div className="mb-2 font-semibold">
                                 Portal selecionado: <span className="text-blue-600">{formatarNomePortal(portal)}</span>
                             </div>
-                            <div className="mt-4">
-                                <div className="flex gap-2 mb-4">
-                                    <Input
-                                        placeholder="Buscar notícias..."
-                                        value={busca}
-                                        onChange={(e) => setBusca(e.target.value)}
-                                    />
-                                </div>
-                                {carregandoNoticias ? (
-                                    <div className="grid gap-4">
+                            <div className="flex flex-col md:flex-row gap-8 mt-4">
+                                <aside className="w-full md:w-1/4 lg:w-1/5">
+                                    <h3 className="font-semibold mb-4 text-lg">Tags Populares</h3>
+                                    {topTags.length > 0 ? (
+                                        <div className="flex flex-wrap gap-2">
+                                            {topTags.map((tag, idx) => (
+                                                <Badge 
+                                                    key={idx} 
+                                                    variant="secondary" 
+                                                    className="cursor-pointer hover:bg-primary/20"
+                                                    onClick={() => handleTagClick(tag)}
+                                                >
+                                                    {tag}
+                                                </Badge>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        !carregandoNoticias && <p className="text-sm text-zinc-500">Nenhuma tag encontrada para este portal.</p>
+                                    )}
+                                </aside>
+
+                                <main className="flex-1">
+                                    <div className="flex gap-2 mb-4">
+                                        <Input
+                                            placeholder="Buscar notícias ou clique em uma tag..."
+                                            value={busca}
+                                            onChange={(e) => setBusca(e.target.value)}
+                                        />
+                                    </div>
+                                    {carregandoNoticias ? (
+                                        <div className="grid gap-4">
                                         {Array.from({ length: 5 }, (_, idx) => (
                                             <Card key={idx}>
                                                 <CardHeader>
@@ -209,119 +261,120 @@ const Home = () => {
                                             </Card>
                                         ))}
                                     </div>
-                                ) : erroNoticias ? (
-                                    <div className="text-red-500">{erroNoticias}</div>
-                                ) : noticiasPaginadas.length === 0 ? (
-                                    <div>Nenhuma notícia encontrada.</div>
-                                ) : (
-                                    <div className="grid gap-4">
-                                        {noticiasPaginadas.map((noticia, idx) => (
-                                            <Dialog key={idx} open={dialogAberto && noticiaSelecionada === noticia} onOpenChange={(open) => {
-                                                setDialogAberto(open);
-                                                if (!open) setNoticiaSelecionada(null);
-                                            }}>
-                                                <DialogTrigger asChild>
-                                                    <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => {
-                                                        setNoticiaSelecionada(noticia);
-                                                        setDialogAberto(true);
-                                                    }}>
-                                                        <CardHeader>
-                                                            <CardTitle>{noticia.title}</CardTitle>
-                                                        </CardHeader>
-                                                        <CardContent>
-                                                            {noticia.description && (
-                                                                <div className="text-zinc-700 text-sm line-clamp-2 mb-2 whitespace-pre-line leading-relaxed">{noticia.description}</div>
+                                    ) : erroNoticias ? (
+                                        <div className="text-red-500">{erroNoticias}</div>
+                                    ) : noticiasPaginadas.length === 0 ? (
+                                        <div>Nenhuma notícia encontrada.</div>
+                                    ) : (
+                                        <div className="grid gap-4">
+                                            {noticiasPaginadas.map((noticia, idx) => (
+                                                <Dialog key={idx} open={dialogAberto && noticiaSelecionada === noticia} onOpenChange={(open) => {
+                                                    setDialogAberto(open);
+                                                    if (!open) setNoticiaSelecionada(null);
+                                                }}>
+                                                    <DialogTrigger asChild>
+                                                        <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => {
+                                                            setNoticiaSelecionada(noticia);
+                                                            setDialogAberto(true);
+                                                        }}>
+                                                            <CardHeader>
+                                                                <CardTitle>{noticia.title}</CardTitle>
+                                                            </CardHeader>
+                                                            <CardContent>
+                                                                {noticia.description && (
+                                                                    <div className="text-zinc-700 text-sm line-clamp-2 mb-2 whitespace-pre-line leading-relaxed">{noticia.description}</div>
+                                                                )}
+                                                            </CardContent>
+                                                            {noticia.link && (
+                                                                <CardFooter>
+                                                                    <a href={noticia.link} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline text-sm">Ler mais</a>
+                                                                </CardFooter>
                                                             )}
-                                                        </CardContent>
-                                                        {noticia.link && (
-                                                            <CardFooter>
-                                                                <a href={noticia.link} target="_blank" rel="noopener noreferrer" className="text-blue-600 underline text-sm">Ler mais</a>
-                                                            </CardFooter>
-                                                        )}
-                                                    </Card>
-                                                </DialogTrigger>
-                                                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                                                    <DialogHeader>
-                                                        <DialogTitle>{noticia.title}</DialogTitle>
-                                                    </DialogHeader>
-                                                    <div className="space-y-4">
-                                                        {noticia.description && (
-                                                            <div>
-                                                                <h4 className="font-semibold mb-2">Descrição</h4>
-                                                                <p className="text-zinc-700">{noticia.description}</p>
-                                                            </div>
-                                                        )}
-                                                        {noticia.body && (
-                                                            <div>
-                                                                <h4 className="font-semibold mb-2">Conteúdo</h4>
-                                                                <div className="text-zinc-700 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: noticia.body }} />
-                                                            </div>
-                                                        )}
-                                                        {noticia.tags && noticia.tags.length > 0 && (
-                                                            <div>
-                                                                <h4 className="font-semibold mb-2">Tags</h4>
-                                                                <div className="flex flex-wrap gap-2">
-                                                                    {noticia.tags.map((tag: string, tagIdx: number) => (
-                                                                        <Badge key={tagIdx} variant="secondary">{tag}</Badge>
-                                                                    ))}
+                                                        </Card>
+                                                    </DialogTrigger>
+                                                    <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                                                        <DialogHeader>
+                                                            <DialogTitle>{noticia.title}</DialogTitle>
+                                                        </DialogHeader>
+                                                        <div className="space-y-4">
+                                                            {noticia.description && (
+                                                                <div>
+                                                                    <h4 className="font-semibold mb-2">Descrição</h4>
+                                                                    <p className="text-zinc-700">{noticia.description}</p>
                                                                 </div>
-                                                            </div>
-                                                        )}
-                                                        {noticia.date && (
-                                                            <div>
-                                                                <h4 className="font-semibold mb-2">Data</h4>
-                                                                <p className="text-zinc-600">{new Date(noticia.date).toLocaleDateString('pt-BR')}</p>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    {noticia.url && (
-                                                        <div className="pt-4 border-t flex justify-end">
-                                                            <Button asChild variant="link" className="px-0 text-blue-600 underline text-base">
-                                                                <a href={noticia.url} target="_blank" rel="noopener noreferrer">
-                                                                    Ver notícia original
-                                                                </a>
-                                                            </Button>
+                                                            )}
+                                                            {noticia.body && (
+                                                                <div>
+                                                                    <h4 className="font-semibold mb-2">Conteúdo</h4>
+                                                                    <div className="text-zinc-700 prose prose-sm max-w-none" dangerouslySetInnerHTML={{ __html: noticia.body }} />
+                                                                </div>
+                                                            )}
+                                                            {noticia.tags && noticia.tags.length > 0 && (
+                                                                <div>
+                                                                    <h4 className="font-semibold mb-2">Tags</h4>
+                                                                    <div className="flex flex-wrap gap-2">
+                                                                        {noticia.tags.map((tag: string, tagIdx: number) => (
+                                                                            <Badge key={tagIdx} variant="secondary">{tag}</Badge>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                            {noticia.date && (
+                                                                <div>
+                                                                    <h4 className="font-semibold mb-2">Data</h4>
+                                                                    <p className="text-zinc-600">{new Date(noticia.date).toLocaleDateString('pt-BR')}</p>
+                                                                </div>
+                                                            )}
                                                         </div>
-                                                    )}
-                                                </DialogContent>
-                                            </Dialog>
-                                        ))}
-                                    </div>
-                                )}
-                                {totalPaginas > 1 && (
-                                    <div className="flex items-center justify-between gap-3 mt-6">
-                                        <p className="text-muted-foreground grow text-sm" aria-live="polite">
-                                            Página <span className="text-foreground">{pagina}</span> de{" "}
-                                            <span className="text-foreground">{totalPaginas}</span>
-                                        </p>
-                                        <Pagination className="w-auto">
-                                            <PaginationContent className="gap-3">
-                                                <PaginationItem>
-                                                    <Button
-                                                        variant="outline"
-                                                        className="aria-disabled:pointer-events-none aria-disabled:opacity-50"
-                                                        aria-disabled={pagina === 1 ? true : undefined}
-                                                        onClick={() => setPagina((p) => Math.max(1, p - 1))}
-                                                        disabled={pagina === 1}
-                                                    >
-                                                        Anterior
-                                                    </Button>
-                                                </PaginationItem>
-                                                <PaginationItem>
-                                                    <Button
-                                                        variant="outline"
-                                                        className="aria-disabled:pointer-events-none aria-disabled:opacity-50"
-                                                        aria-disabled={pagina === totalPaginas ? true : undefined}
-                                                        onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
-                                                        disabled={pagina === totalPaginas}
-                                                    >
-                                                        Próxima
-                                                    </Button>
-                                                </PaginationItem>
-                                            </PaginationContent>
-                                        </Pagination>
-                                    </div>
-                                )}
+                                                        {noticia.url && (
+                                                            <div className="pt-4 border-t flex justify-end">
+                                                                <Button asChild variant="link" className="px-0 text-blue-600 underline text-base">
+                                                                    <a href={noticia.url} target="_blank" rel="noopener noreferrer">
+                                                                        Ver notícia original
+                                                                    </a>
+                                                                </Button>
+                                                            </div>
+                                                        )}
+                                                    </DialogContent>
+                                                </Dialog>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {totalPaginas > 1 && (
+                                        <div className="flex items-center justify-between gap-3 mt-6">
+                                            <p className="text-muted-foreground grow text-sm" aria-live="polite">
+                                                Página <span className="text-foreground">{pagina}</span> de{" "}
+                                                <span className="text-foreground">{totalPaginas}</span>
+                                            </p>
+                                            <Pagination className="w-auto">
+                                                <PaginationContent className="gap-3">
+                                                    <PaginationItem>
+                                                        <Button
+                                                            variant="outline"
+                                                            className="aria-disabled:pointer-events-none aria-disabled:opacity-50"
+                                                            aria-disabled={pagina === 1 ? true : undefined}
+                                                            onClick={() => setPagina((p) => Math.max(1, p - 1))}
+                                                            disabled={pagina === 1}
+                                                        >
+                                                            Anterior
+                                                        </Button>
+                                                    </PaginationItem>
+                                                    <PaginationItem>
+                                                        <Button
+                                                            variant="outline"
+                                                            className="aria-disabled:pointer-events-none aria-disabled:opacity-50"
+                                                            aria-disabled={pagina === totalPaginas ? true : undefined}
+                                                            onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+                                                            disabled={pagina === totalPaginas}
+                                                        >
+                                                            Próxima
+                                                        </Button>
+                                                    </PaginationItem>
+                                                </PaginationContent>
+                                            </Pagination>
+                                        </div>
+                                    )}
+                                </main>
                             </div>
                         </TabsContent>
                     ))}
