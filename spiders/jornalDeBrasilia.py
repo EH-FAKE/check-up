@@ -60,12 +60,11 @@ class JornalDeBrasiliaSpider(BaseSpider):
         """
         Extrai URLs de notícias da página inicial
         """
-        # Seletores específicos do Jornal de Brasília
         selectors = [
-            "article a[href]",  # Links dentro de artigos
-            ".news-item a[href]",  # Links em itens de notícia
-            ".headline a[href]",  # Links em manchetes
-            "h2 a[href], h3 a[href]",  # Links em títulos
+            "article a[href]", 
+            ".news-item a[href]", 
+            ".headline a[href]",  
+            "h2 a[href], h3 a[href]",  
         ]
         
         seen_urls = set()

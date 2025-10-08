@@ -1,45 +1,147 @@
-import time
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
+
 from plays.base import BasePlay
 from plays.items import EntryItem
 from plog import logger
 
-class CorreioPlay(BasePlay):
-    name = "correio"
+
+class JornalDeBrasiliaPlay(BasePlay):
+    name = "jornaldebrasilia"
 
     @classmethod
-    def match(cls, url):
-        """Identifica se a URL é do Correio Braziliense"""
-        return "correiobraziliense.com.br" in url
+    def match(cls, url: str) -> bool:
+        """Verifica se a URL pertence ao Jornal de Brasília."""
+        return "jornaldebrasilia.com.br" in url
 
     def pre_run(self):
-        """Configurações antes da execução"""
-        pass
+        """Método executado antes do 'run'."""
+        logger.info(f"[{self.name}] Preparando para extrair a URL: {self.url}")
 
     def run(self) -> EntryItem:
-        """Extrai conteúdo da notícia"""
+        """Executa a extração principal dos dados da página."""
         with sync_playwright() as p:
-            browser = self.launch_browser(p, viewport={"width": 1920, "height": 1080})
-            page = browser.new_page()
+            browser = p.chromium.launch()
+            page = browser.new_page(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36"
+            )
+
+            page.route(
+                "**/*",
+                lambda route: route.abort()
+                if route.request.resource_type in {"image", "font", "media", "stylesheet"}
+                else route.continue_(),
+            )
             
-            logger.info(f"[{self.name}] Opening URL '{self.url}'...")
-            page.goto(self.url, timeout=180_000)
+            page.set_default_navigation_timeout(60_000)
+            page.set_default_timeout(10_000) 
+
+            try:
+                page.goto(self.url, wait_until="domcontentloaded", timeout=60_000)
+                page.wait_for_timeout(2000) 
+            except PlaywrightTimeoutError:
+                logger.error(f"[{self.name}] Timeout ao carregar a página: {self.url}")
+                browser.close()
+                return EntryItem(title="", url=self.url, description="", body="", tags=[])
+
+
+            # Título
+            title = ""
+            title_selectors = [
+                "h1.tdb-title-text",
+                ".wrap-title > h1",
+                "h1.title",
+                "h1.entry-title",
+                ".post-title",
+                ".content-head__title",
+                "h1" 
+            ]
+            for selector in title_selectors:
+                try:
+                    el = page.locator(selector).first
+                    if el.is_visible(timeout=1000):
+                        title = el.inner_text().strip()
+                        if title:
+                            logger.info(f"[{self.name}] Título encontrado com o seletor: '{selector}'")
+                            break
+                except Exception:
+                    continue
             
-            # Aguardar carregamento
-            page.wait_for_selector("h1", timeout=30000)
-            
-            # 1. EXTRAIR TÍTULO
-            title = self._extract_title(page)
-            
-            # 2. EXTRAIR DESCRIÇÃO
-            description = self._extract_description(page)
-            
-            # 3. EXTRAIR CORPO
-            body = self._extract_body(page)
-            
-            # 4. EXTRAIR TAGS
-            tags = self._extract_tags(page)
-            
+            if not title:
+                try:
+                    title = page.title().strip().split("|")[0].strip()
+                except Exception:
+                    title = ""
+
+
+            # Descrição (Subtítulo)
+            description = ""
+            description_selectors = [
+                ".wrap-title > p:nth-child(2)",
+                "p.tdb-post-sub-title",
+                ".subtitle h2",
+                "p.td-post-sub-title"
+            ]
+            for selector in description_selectors:
+                try:
+                    el = page.locator(selector).first
+                    if el.is_visible(timeout=1000):
+                        description = el.inner_text().strip()
+                        if description:
+                            logger.info(f"[{self.name}] Descrição encontrada com o seletor: '{selector}'")
+                            break
+                except Exception:
+                    continue
+
+            # Corpo da Notícia
+            body = ""
+            body_container_selectors = [
+                "div.tdb-block-inner.td-fix-index",
+                ".the-post-content",
+                ".td-post-content"
+            ]
+            for selector in body_container_selectors:
+                try:
+                    container = page.locator(selector).first
+                    if container.is_visible(timeout=1500):
+                        logger.info(f"[{self.name}] Contêiner do corpo encontrado com o seletor: '{selector}'")
+                        
+                        # Extrai todos os parágrafos <p> de dentro do contêiner
+                        paragraphs = container.locator("p")
+                        parts = []
+                        for i in range(paragraphs.count()):
+                            p_text = paragraphs.nth(i).inner_text().strip()
+                            # Filtro para remover parágrafos indesejados
+                            if p_text and len(p_text) > 40 and not p_text.lower().startswith(("leia mais", ">>", "crédito:", "siga o jornal")):
+                                parts.append(p_text)
+                        
+                        if parts:
+                            body = "\n\n".join(parts)
+                            logger.info(f"[{self.name}] Corpo extraído com sucesso! Caracteres: {len(body)}")
+                            break # Sai do loop principal se o corpo foi extraído
+                except Exception:
+                    continue
+
+            # Extração de Tags (opcional, pois nem sempre estão presentes)
+            tags = []
+            tag_selectors = [
+                ".tdb-tags a",
+                ".entities__list-item a",
+                ".entities__list li a"
+            ]
+            for selector in tag_selectors:
+                try:
+                    tag_elements = page.locator(selector)
+                    if tag_elements.count() > 0:
+                        tag_list = [el.inner_text().strip() for el in tag_elements.all()]
+                        tags = [t for t in tag_list if t] # Remove tags vazias
+                        if tags:
+                            logger.info(f"[{self.name}] {len(tags)} tags encontradas com o seletor: '{selector}'")
+                            break
+                except Exception:
+                    continue
+                
+            browser.close()
+
             return EntryItem(
                 title=title,
                 url=self.url,
@@ -48,114 +150,3 @@ class CorreioPlay(BasePlay):
                 tags=tags,
             )
 
-    def _extract_title(self, page):
-        """Extrai o título da notícia"""
-        selectors = [
-            "h1.title",
-            "h1.headline", 
-            "h1",
-            ".article-title h1",
-            ".post-title h1"
-        ]
-        
-        for selector in selectors:
-            try:
-                element = page.locator(selector)
-                if element.count() > 0:
-                    title = element.first.inner_text().strip()
-                    if title:
-                        logger.info(f"[{self.name}] Title extracted: {title[:50]}...")
-                        return title
-            except Exception as e:
-                logger.warning(f"[{self.name}] Failed to extract title with {selector}: {str(e)}")
-                continue
-        
-        logger.error(f"[{self.name}] Failed to extract title")
-        return ""
-
-    def _extract_description(self, page):
-        """Extrai a descrição/subtítulo da notícia"""
-        selectors = [
-            ".subtitle",
-            ".lead",
-            ".summary", 
-            ".article-subtitle",
-            "h2.subtitle",
-            ".excerpt"
-        ]
-        
-        for selector in selectors:
-            try:
-                element = page.locator(selector)
-                if element.count() > 0:
-                    description = element.first.inner_text().strip()
-                    if description and len(description) > 10:
-                        logger.info(f"[{self.name}] Description extracted: {description[:50]}...")
-                        return description
-            except Exception as e:
-                logger.warning(f"[{self.name}] Failed to extract description with {selector}: {str(e)}")
-                continue
-        
-        logger.info(f"[{self.name}] No description found")
-        return ""
-
-    def _extract_body(self, page):
-        """Extrai o corpo da notícia"""
-        selectors = [
-            ".article-content",
-            ".post-content",
-            ".content",
-            ".article-body",
-            ".text",
-            "article .content",
-            ".entry-content"
-        ]
-        
-        for selector in selectors:
-            try:
-                element = page.locator(selector)
-                if element.count() > 0:
-                    # Remover elementos indesejados
-                    element.locator("script, style, .ad, .advertisement").evaluate_all("el => el.remove()")
-                    
-                    body = element.inner_text().strip()
-                    if body and len(body) > 100:  # Garantir que tem conteúdo substancial
-                        logger.info(f"[{self.name}] Body extracted ({len(body)} chars)")
-                        return body
-            except Exception as e:
-                logger.warning(f"[{self.name}] Failed to extract body with {selector}: {str(e)}")
-                continue
-        
-        logger.error(f"[{self.name}] Failed to extract body")
-        return ""
-
-    def _extract_tags(self, page):
-        """Extrai as tags da notícia"""
-        selectors = [
-            ".tags a",
-            ".categories a",
-            ".post-tags a", 
-            ".article-tags a",
-            ".keywords a",
-            "[rel='tag']"
-        ]
-        
-        tags = []
-        
-        for selector in selectors:
-            try:
-                elements = page.locator(selector)
-                if elements.count() > 0:
-                    for i in range(elements.count()):
-                        tag_text = elements.nth(i).inner_text().strip()
-                        if tag_text and tag_text not in tags:
-                            tags.append(tag_text)
-                    
-                    if tags:
-                        logger.info(f"[{self.name}] Tags extracted: {tags}")
-                        break
-            except Exception as e:
-                logger.warning(f"[{self.name}] Failed to extract tags with {selector}: {str(e)}")
-                continue
-        
-        return tags
