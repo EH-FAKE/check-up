@@ -108,6 +108,9 @@ class AgoraNoValePlay(BasePlay):
                 "article .content p",
                 "article p",
                 "div[itemprop='articleBody']",
+                "article .post-content",
+                "article .post-content p .post-content h1, .post-content h2, .post-content h3, .post-content ol, .post-content ul",
+               
             ]:
                 try:
                     els = page.locator(selector)
