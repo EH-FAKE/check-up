@@ -1,4 +1,4 @@
-.PHONY: start scrape scrape_no_openai crawl crawl_metropoles init_db migrate_db setup bash env stop wait-for-db prune install_playwright test_playwright install_playwright_force
+.PHONY: start scrape scrape_no_openai crawl crawl_metropoles init_db migrate_db setup bash env stop wait-for-db prune test_playwright
 
 # Configuração do ambiente
 env:
@@ -11,7 +11,7 @@ env:
 	fi
 
 # Configuração completa do projeto
-setup: env start wait-for-db init_db migrate_db install_playwright
+setup: env start wait-for-db init_db migrate_db
 	@echo "Ambiente configurado com sucesso!"
 
 # Acesso ao shell do container
@@ -52,40 +52,40 @@ wait-for-db:
 	fi
 
 # Scraping com e sem OpenAI
-scrape: install_playwright
+scrape:
 	docker compose run --rm scraper python scrape.py
 
-scrape_no_openai: install_playwright
+scrape_no_openai:
 	docker compose run --rm scraper python scrape_no_openai.py
 
 # Scraping por plataforma específica (sem OpenAI)
-scrape_metropoles: install_playwright
+scrape_metropoles:
 	docker compose exec scraper python scrape_no_openai.py --platform metropoles.com
 
 # Comando para verificação de instalação do Playwright
-test_playwright: install_playwright
+test_playwright:
 	@echo "Verificando instalação do Playwright..."
 	docker compose exec scraper python -c "from playwright.sync_api import sync_playwright; print('Iniciando teste do Playwright'); p = sync_playwright().start(); print('Playwright iniciado com sucesso'); browser = p.firefox.launch(); print('Navegador lançado com sucesso'); page = browser.new_page(); print('Nova página criada'); page.goto('https://www.example.com'); print('Página carregada'); browser.close(); p.stop(); print('Teste do Playwright concluído com sucesso')"
 
-scrape_maisgoias: install_playwright
+scrape_maisgoias:
 	docker compose exec scraper python scrape_no_openai.py --platform maisgoias.com.br
 
-scrape_aliadosbrasil: install_playwright
+scrape_aliadosbrasil:
 	docker compose exec scraper python scrape_no_openai.py --platform aliadosbrasiloficial.com.br
 
-scrape_ig: install_playwright
+scrape_ig:
 	docker compose exec scraper python scrape_no_openai.py --platform ig.com.br
 
-scrape_veja: install_playwright
+scrape_veja:
 	docker compose exec scraper python scrape_no_openai.py --platform veja.abril.com.br
 
-scrape_r7: install_playwright
+scrape_r7:
 	docker compose exec scraper python scrape_no_openai.py --platform r7.com
 
-scrape_uol: install_playwright
+scrape_uol:
 	docker compose exec scraper python scrape_no_openai.py --platform uol.com.br
 
-scrape_folha: install_playwright
+scrape_folha:
 	docker compose exec scraper python scrape_no_openai.py --platform folha.uol.com.br
 	
 # Crawler para todos os portais ou específicos
@@ -166,21 +166,6 @@ collect: crawl_metropoles scrape_no_openai
 collect_working: crawl_all_working scrape_all_working
 	@echo "Coleta completa de todos os portais funcionais concluída!"
 
-# Instala navegadores do Playwright com as permissões corretas
-install_playwright:
-	@echo "Instalando navegadores do Playwright com as permissões adequadas..."
-	docker compose exec --user root scraper bash -c "mkdir -p /project/.cache && chmod 777 /project/.cache && source /usr/src/.venv/bin/activate && PLAYWRIGHT_BROWSERS_PATH=/project/.cache/ms-playwright playwright install --with-deps firefox"
-	docker compose exec --user root scraper bash -c "mkdir -p /project/.cache/ms-playwright && chmod -R 777 /project/.cache/ms-playwright"
-	@echo "Navegador Firefox instalado com sucesso para o Playwright!"
-
-# Instala navegadores do Playwright de forma forçada (para casos de erro persistente)
-install_playwright_force:
-	@echo "Forçando reinstalação completa dos navegadores do Playwright..."
-	docker compose exec --user root scraper bash -c "rm -rf /project/.cache/ms-playwright || true"
-	docker compose exec --user root scraper bash -c "mkdir -p /project/.cache/ms-playwright && chmod 777 /project/.cache/ms-playwright"
-	docker compose exec --user root scraper bash -c "source /usr/src/.venv/bin/activate && PLAYWRIGHT_BROWSERS_PATH=/project/.cache/ms-playwright playwright install --with-deps firefox"
-	docker compose exec --user root scraper bash -c "chmod -R 777 /project/.cache/ms-playwright"
-	@echo "Navegador Firefox reinstalado com sucesso para o Playwright!"
 
 # Exibir ajuda
 help:
@@ -223,8 +208,6 @@ help:
 	@echo "  make init_db           - Inicializa as tabelas do banco de dados"
 	@echo "  make migrate_db        - Executa as migrações do banco de dados"
 	@echo "  make prune             - Remove containers, redes e imagens não utilizadas"
-	@echo "  make install_playwright - Instala navegadores do Playwright com as permissões corretas"
-	@echo "  make install_playwright_force - Reinstala navegadores do Playwright de forma forçada"
 	@echo "  make test_playwright   - Testa se a instalação do Playwright está funcionando"
 
 .PHONY: start scrape scrape_no_openai scrape_fixed scrape_working install run-backend run-frontend docker-run-backend docker-run-frontend docker-build-backend docker-build-frontend all stop down
