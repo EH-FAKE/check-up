@@ -8,58 +8,61 @@ from spiders.items import URLItem
 
 class AgoraNoValeSpider(BaseSpider):
     name = "agoranovalespider"
-    start_urls = ["https://agoranovale.com.br/"]
     allowed_domains = ["agoranovale.com.br", "www.agoranovale.com.br"]
+    start_urls = ["https://agoranovale.com.br/"]
 
     custom_settings = {
         **BaseSpider.custom_settings,
         "COOKIES_ENABLED": True,
-        "DOWNLOAD_DELAY": 2,
+        "DOWNLOAD_DELAY": 3,
         "RANDOMIZE_DOWNLOAD_DELAY": True,
         "DEFAULT_REQUEST_HEADERS": {
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
             "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
-            "Accept-Encoding": "gzip, deflate, br",
             "Connection": "keep-alive",
             "Upgrade-Insecure-Requests": "1",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0 Safari/537.36",
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/114.0 Safari/537.36"
+            ),
+            "Cache-Control": "max-age=0",
         },
         "CONCURRENT_REQUESTS": 4,
     }
 
     BLACKLISTED_SECTIONS = {
-        
+        "/agoranacozinha",
+      
     }
+
+    
+    def _normalize(self, url: str) -> str:
+        return url.split("#", 1)[0].split("?", 1)[0]
 
     def allow_url(self, url: str) -> bool:
         if not url:
             return False
 
-        # Normaliza URL, remove fragmentos e query
-        url = url.split('#', 1)[0].split('?', 1)[0]
+        url = self._normalize(url)
 
-        # Considera apenas links do domínio agoranovale.com.br
-        if not re.match(r"https?://(www\.)?agoranovale\.com\.br/", url):
-            return False
 
-        path = re.sub(r"https?://[^/]+", "", url)
-        segments_norm = [s.lower() for s in path.strip("/").split("/") if s]
-
-        # Blacklist por prefixo em qualquer segmento
-        blacklist_prefixes = {p.lstrip('/').lower() for p in self.BLACKLISTED_SECTIONS}
-        for seg in segments_norm:
-            if any(seg.startswith(pref) for pref in blacklist_prefixes):
+        path = re.sub(r"^https?://[^/]+", "", url)
+        segments = [s for s in path.strip("/").split("/") if s]
+        if len(segments) < 2:
+            return False  
+        
+        # blacklist por prefixo 
+        bl = {p.lstrip("/").lower() for p in self.BLACKLISTED_SECTIONS}
+        for seg in (s.lower() for s in segments):
+            if any(seg.startswith(pref) for pref in bl):
                 return False
 
-        # Exige ao menos dois segmentos (seção + slug)
-        segments = [s for s in path.split('/') if s]
-        if len(segments) < 2:
-            return False
+        slug = segments[-1].lower()
 
-        slug = segments[-1]
-
-        # Aceita slugs de notícia com ao menos 3 hífens
-        return slug.count('-') >= 3
+       
+        # heurística simples de notícia: slug com ao menos 3 hífens ou nome longo
+        return slug.count("-") >= 3 or len(slug) >= 20
 
     def start_requests(self):
         for url in self.start_urls:
@@ -72,18 +75,23 @@ class AgoraNoValeSpider(BaseSpider):
 
     def parse(self, response):
         seen = set()
+
         selectors = [
-            "a[href*='agoranovale.com.br/']",
+            "a[href*='agoranovale.com.br']",
             "a[href^='/']",
+            "article a[href]",
+            "main a[href]",
+            "h1 a[href], h2 a[href], h3 a[href], .entry-title a[href], .post a[href]",
+            "link[rel='canonical'][href]",
         ]
 
         for sel in selectors:
-            for entry in response.css(sel):
-                href = entry.attrib.get("href")
+            for node in response.css(sel):
+                href = node.attrib.get("href")
                 if not href:
                     continue
 
-                url = response.urljoin(href).split('?', 1)[0].split('#', 1)[0]
+                url = self._normalize(response.urljoin(href))
                 if url in seen:
                     continue
 
@@ -91,4 +99,6 @@ class AgoraNoValeSpider(BaseSpider):
                     seen.add(url)
                     yield URLItem(url=url)
 
-        self.logger.info(f"Collected {len(seen)} unique news URLs from Agora no Vale")
+        self.logger.info(
+            f"[AgoraNoVale] Coletadas {len(seen)} URLs únicas de notícia em {response.url}"
+        )
