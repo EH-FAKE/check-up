@@ -7,5 +7,5 @@ contact_links:
     url: https://github.com/EH-FAKE/check-up/blob/develop/TUTORIAL_SPIDERS_PLAYS.md
     about: Leia o tutorial de contribuição com spiders e plays existentes antes de contribuir
   - name: 📚 Tutorial de Contribuição com novos Spiders e Plays
-    url: https://github.com/EH-FAKE/check-up/blob/develop/TUTORIAL_OUTROS_TESTES.md
+    url: https://github.com/EH-FAKE/check-up/blob/develop/TUTORIAL_CRIACAO_DO_ZERO.md
     about: Leia o tutorial de contribuição com novos spiders e plays antes de contribuir
