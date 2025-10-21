@@ -17,6 +17,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "dompurify": "^3.3.0",
     "lucide-react": "^0.523.0",
     "radix-ui": "^1.4.2",
     "react": "^19.1.0",
@@ -27,6 +28,7 @@
   "devDependencies": {
     "@biomejs/biome": "2.0.5",
     "@eslint/js": "^9.29.0",
+    "@types/dompurify": "^3.0.5",
     "@types/node": "^24.0.4",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
