@@ -1,8 +1,5 @@
-// COMANDO PARA INSTALAR DEPENDÊNCIAS (caso ainda não tenha):
-// npm install lucide-react dompurify
-// npm install -D @types/dompurify
 
-import { useEffect, useMemo, useState } from "react"; // <-- Adicionado useMemo
+import { useEffect, useMemo, useState } from "react"; 
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "./components/ui/card";
@@ -24,7 +21,7 @@ import {
     DialogTitle, 
     DialogFooter, 
     DialogTrigger,
-    DialogDescription // <-- CORREÇÃO 1: Importado do lugar certo
+    DialogDescription 
 } from "./components/ui/dialog";
 import { Skeleton } from "./components/ui/skeleton";
 import { cn } from "@/lib/utils"; 
@@ -44,7 +41,7 @@ import maisgoias from './public/assets/maisgoias.jpeg'
 import  aliadosbrasil from './public/assets/aliadosbrasil.jpeg'
 import  ig from './public/assets/IG.png'
 import  folha from './public/assets/folha.jpeg'
-// REMOVIDA a importação duplicada de DialogDescription
+
 
 const API_URL = "http://localhost:8000"
 
@@ -59,7 +56,7 @@ const portalIcons: Record<string, string> = {
     folha_uol_com_br: folha,
 };
 
-// Função utilitária (como no seu original)
+
 function formatarNomePortal(portal: string) {
     const nome = portal.replace(/_/g, ".").toLowerCase();
     return nome.charAt(0).toUpperCase() + nome.slice(1);
@@ -78,7 +75,7 @@ const Home = () => {
     const [dialogAberto, setDialogAberto] = useState(false);
     const [noticiasPorPortal, setNoticiasPorPortal] = useState<Record<string, number>>({});
     
-    // --- ESTADOS REATORADOS ---
+ 
     // Estados para a seção de PORTAIS
     const [buscaPortal, setBuscaPortal] = useState("");
     const [paginaPortal, setPaginaPortal] = useState(1);
@@ -245,7 +242,7 @@ const Home = () => {
         }
     }, [portais]);
 
-    // Handlers de clique (agora separados)
+    // Handlers de clique 
     const handleTagClickPortal = (tag: string) => {
         setBuscaPortal(buscaPortal === tag ? "" : tag);
     };
@@ -260,7 +257,6 @@ const Home = () => {
         setBuscaFavoritos("");
     };
 
-    // --- LÓGICA DE PAGINAÇÃO REATORADA ---
     // Agora é uma função que aceita parâmetros
     const getPaginationRange = (totalPages: number, currentPage: number) => {
         const siblingCount = 1;
@@ -297,7 +293,6 @@ const Home = () => {
     const pageNumbersPortal = getPaginationRange(totalPaginasPortal, paginaPortal);
     const pageNumbersFavoritos = getPaginationRange(totalPaginasFavoritos, paginaFavoritos);
     
-    // --- COMPONENTE REUTILIZÁVEL PARA RENDERIZAR NOTÍCIAS (igual) ---
     const RenderNoticiasGrid = ({ noticiasParaRenderizar }: { noticiasParaRenderizar: any[] }) => {
         return (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -404,9 +399,8 @@ const Home = () => {
                                         </div>
                                     )}
                                 </div>
-                            </div> {/* <-- DIV DO SCROLL TERMINA AQUI */}
+                            </div> 
 
-                            {/* FOOTER FICA FORA DA DIV DO SCROLL */}
                             {noticia.url && (
                                 <DialogFooter>
                                     <Button asChild variant="default">
@@ -417,7 +411,6 @@ const Home = () => {
                                     </Button>
                                 </DialogFooter>
                             )}
-                            {/* --- FIM DA CORREÇÃO 2 --- */}
 
                         </DialogContent>
                     </Dialog>
@@ -425,7 +418,6 @@ const Home = () => {
             </div>
         );
     };
-    // --- FIM DO COMPONENTE REUTILIZÁVEL ---
 
     // ESTADO DE LOADING (igual)
     if (loading) return (
