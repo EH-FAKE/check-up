@@ -89,7 +89,13 @@ class Poder360Play(BasePlay):
                 element = page.locator(selector)
                 if element.count() > 0:
                     # Remover elementos indesejados (anúncios, formulários de inscrição, etc.)
-                    element.locator(".ads-div, .shortcode-newsletter, .form-subscribe, .box-advertising").evaluate_all("el => el.remove()")
+                    element.evaluate('''
+                        (element) => {
+                            const selectors = ".ads-div, .shortcode-newsletter, .form-subscribe, .box-advertising";
+                            const toRemove = element.querySelectorAll(selectors);
+                            toRemove.forEach(el => el.remove());
+                        }
+                    ''')
                     
                     body = element.inner_text().strip()
                     if body and len(body) > 100:  # Garantir que tem conteúdo substancial
