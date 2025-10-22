@@ -13,6 +13,7 @@ RUN /root/.local/bin/pipenv sync --dev
 # Instala minio e browsers no venv
 RUN /root/.local/bin/pipenv install minio==7.2.15
 RUN /root/.local/bin/pipenv install scrapy-playwright==0.0.43
+ENV PLAYWRIGHT_BROWSERS_PATH=/usr/src/.venv/pw-browsers
 RUN /root/.local/bin/pipenv run playwright install --with-deps firefox
 
 # Confirma que playwright foi instalado corretamente
@@ -34,7 +35,8 @@ RUN apt-get update \
 
 ENV PATH=/usr/src/.venv/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PLAYWRIGHT_BROWSERS_PATH=/usr/src/.venv/pw-browsers
 
 WORKDIR /project
 
