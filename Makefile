@@ -82,7 +82,10 @@ scrape_uol:
 
 scrape_folha:
 	docker compose exec scraper python scrape_no_openai.py --platform folha.uol.com.br
-	
+
+scrape_jornalDeBrasilia:
+	docker compose exec scraper python scrape_no_openai.py --platform jornaldebrasilia.com.br
+
 # Crawler para todos os portais ou específicos
 crawl:
 	docker compose run --rm scraper python crawl.py
@@ -112,6 +115,9 @@ crawl_ig:
 crawl_folha:
 	docker compose run scraper python crawl.py folhaspider
 
+crawl_jornalDeBrasilia: 
+	docker compose run scraper python crawl.py jornaldebrasiliaspider
+
 # Workflow completo de coleta de URLs
 crawl_all_working:
 	@echo "Executando crawl de todos os portais funcionais..."
@@ -123,6 +129,7 @@ crawl_all_working:
 	@make crawl_aliadosBrasil
 	@make crawl_ig
 	@make crawl_folha
+	@make crawl_jornalDeBrasilia
 	@echo "Crawl de todos os portais concluído!"
 
 # Workflow completo de scraping
@@ -136,6 +143,7 @@ scrape_all_working:
 	@make scrape_r7
 	@make scrape_uol
 	@make scrape_folha
+	@make scrape_jornalDeBrasilia
 	@echo "Scraping de todos os portais concluído!"
 
 # Pipeline completo: crawl + scrape
