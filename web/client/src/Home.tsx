@@ -155,7 +155,6 @@ const Home = () => {
                 <Tabs value={portalSelecionado ?? undefined} onValueChange={setPortalSelecionado} className="w-full">
                     <TabsList className="mx-auto flex w-full max-w-4xl bg-transparent mb-6 h-auto ">
                         {portais.map((portal) => {
-                            //console.log(`[Debug] Portal: "${portal}", Caminho do Ícone: "${portalIcons[portal]}"`);
                             return (
                                 <TabsTrigger
                                     key={portal}
