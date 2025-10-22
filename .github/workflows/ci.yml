@@ -1,219 +1,57 @@
-name: Check-up CI
-
+name: Documentação - Verifica e Publica
 on:
   push:
-    branches: [ main, develop ]
+    branches:
+      - documentation
   pull_request:
-    branches: [ main, develop ]
-
+    branches:
+      - documentation
+permissions:
+  contents: write
 jobs:
-  lint:
-    name: Lint Code
+  build-docs:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Checkout repository
+        uses: actions/checkout@v3
         with:
-          python-version: '3.12'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install flake8
-          pip install pipenv
-          pipenv install --dev --system
-
-      - name: Lint with flake8
-        run: |
-          # Verificar apenas erros críticos
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          # Verificar outros erros mas não falhar o build
-          flake8 . --count --exit-zero --max-complexity=15 --max-line-length=150 --extend-ignore=W191,W293,W292,E303,F401,F841,E712,E124,E201 --statistics
-
-  backend:
-    name: Backend Python (Lint e Healthcheck)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: web/server
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.12'
-
-      - name: Install flake8
-        run: pip install flake8
-
-      - name: Lint com Flake8
-        run: flake8 .
-
-      - name: Instalar dependências do backend
-        run: pip install -r requirements.txt
-
-      - name: Subir backend (Uvicorn) em background
-        run: |
-          nohup uvicorn main:app --host 0.0.0.0 --port 8000 &
-          sleep 5
-
-      - name: Healthcheck FastAPI
-        run: |
-          curl --fail http://localhost:8000/ping
-
-  frontend:
-    name: Frontend Web (Lint e Build)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: web/client
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Install pnpm
-        run: npm install -g pnpm@latest
-
-      - name: Install dependencies
-        run: pnpm install
-
-      - name: Lint com Biome
-        run: pnpm exec biome check --write
-
-      - name: Build
-        run: pnpm run build
-
-  docker-test:
-    name: Docker Build and Test
-    runs-on: ubuntu-latest
-    needs: [lint, frontend, backend]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Start PostgreSQL
-        run: |
-          docker run -d --name postgres \
-            -e POSTGRES_USER=postgres \
-            -e POSTGRES_PASSWORD=postgres \
-            -e POSTGRES_DB=test_healthcheck \
-            -p 5432:5432 \
-            postgres:16
-          # Espera o PostgreSQL iniciar
-          timeout 30s bash -c 'until docker exec postgres pg_isready; do sleep 1; done'
-
-      - name: Start MinIO
-        run: |
-          docker run -d --name minio \
-            -e MINIO_ROOT_USER=minioadmin \
-            -e MINIO_ROOT_PASSWORD=minioadmin \
-            -p 9000:9000 -p 9001:9001 \
-            minio/minio:RELEASE.2023-11-20T22-40-07Z server /data --console-address ":9001"
-          # Dar tempo para o MinIO iniciar (não requer healthcheck preciso)
-          sleep 10
-
-      - name: Setup Python Environment
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.12'
+          python-version: '3.10'
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pipenv
-          pipenv install --dev --system
+          pip install -r requirements.txt
 
-      - name: Install Playwright browsers
-        run: |
-          pipenv run playwright install --with-deps firefox
+      - name: Build documentation
+        run: mkdocs build --strict
 
-      - name: Prepare test environment
-        run: |
-          cp env.example .env
-          # Configure test environment variables
-          echo "DB_HOST=localhost" >> .env
-          echo "DB_PORT=5432" >> .env
-          echo "DB_USER=postgres" >> .env
-          echo "DB_PASSWORD=postgres" >> .env
-          echo "DB_NAME=test_healthcheck" >> .env
-          echo "MINIO_ENDPOINT=localhost:9000" >> .env
-          echo "MINIO_ACCESS_KEY=minioadmin" >> .env
-          echo "MINIO_SECRET_KEY=minioadmin" >> .env
-          echo "MINIO_SECURE=False" >> .env
-          
-          # Patch de configuração temporária para CI
-          sed -i.bak 's/healthcheck_db/localhost/g' settings.py
-          sed -i.bak 's/healthcheck_minio/localhost/g' settings.py
-
-      - name: Create CI-specific database init script
-        run: |
-          cat > create_db_ci.py << 'EOF'
-          from sqlalchemy import create_engine
-          from models import Portal, Entry, Advertisement, URLQueue, QueueStatus
-
-          # Conexão direta para o ambiente de CI
-          DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/test_healthcheck"
-          engine = create_engine(DATABASE_URL)
-
-          # Cria as tabelas no banco de dados
-          print("Criando tabelas no banco de dados...")
-          Portal.metadata.create_all(engine)
-          Entry.metadata.create_all(engine)
-          Advertisement.metadata.create_all(engine)
-          URLQueue.metadata.create_all(engine)
-          QueueStatus.metadata.create_all(engine)
-          print("Tabelas criadas com sucesso!")
-          EOF
-
-      - name: Initialize database
-        run: python create_db_ci.py
-
-      - name: Run tests
-        run: pytest -xvs tests/
-
-      - name: Cleanup containers
-        if: always()
-        run: |
-          docker stop minio postgres || true
-          docker rm minio postgres || true
-
-  docker-build:
-    name: Test Docker Build
+  deploy-docs:
+    needs: build-docs
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/documentation') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    needs: [lint, frontend, backend]
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build Docker image
-        uses: docker/build-push-action@v5
+      - name: Checkout repository
+        uses: actions/checkout@v3
         with:
-          context: .
-          file: ./Dockerfile
-          push: false
-          load: true
-          tags: check-up:test
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          fetch-depth: 0
 
-      - name: Test Docker image
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
         run: |
-          docker run --rm check-up:test python -c "print('Docker image built successfully')" 
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Deploy documentation
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+          mkdocs gh-deploy --force
