@@ -1,20 +1,13 @@
 name: Documentação - Verifica e Publica
-
 on:
   push:
     branches:
-      - docs
-    paths:
-      - 'docs/**'
-      - 'mkdocs.yml'
+      - documentation
   pull_request:
     branches:
-      - docs
-  workflow_dispatch:
-
+      - documentation
 permissions:
   contents: write
-
 jobs:
   build-docs:
     runs-on: ubuntu-latest
@@ -36,10 +29,10 @@ jobs:
 
       - name: Build documentation
         run: mkdocs build --strict
-        
+
   deploy-docs:
     needs: build-docs
-    if: github.event_name == 'push' && github.ref == 'refs/heads/docs' || github.event_name == 'workflow_dispatch'
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/documentation') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -61,4 +54,4 @@ jobs:
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
-          mkdocs gh-deploy --force 
+          mkdocs gh-deploy --force
