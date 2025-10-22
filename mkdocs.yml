@@ -1,0 +1,59 @@
+site_name: Eh-Fake
+site_description: Uma fusão de jornalismo e arte pop
+site_author: Seu Nome
+repo_url: htpps://github.com/EH-FAKE
+repo_name: EH-FAKE
+docs_dir: docs
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: blue
+      toggle:
+        icon: material/weather-night
+        name: Modo escuro
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom-dark
+      accent: gray
+      toggle:
+        icon: material/weather-sunny
+        name: Modo claro
+  font:
+    text: Roboto Slab
+    code: Fira Code
+  logo: ../assets/logo-ehfake-light.png
+  favicon: ../assets/icon-ehfake.svg
+
+nav:
+  - Home: index.md
+  - Sobre:
+    - O que é o Eh-Fake?: sobre/o-que-e.md
+    - Check-up: sobre/check-up.md
+    - Pipeline de Dados: sobre/Pipeline_dados_scraps.md
+  - Guia de Contribuição:
+    - Política de Branches: guia-de-contribuicao/politica-de-branches.md
+    - Política de Commits: guia-de-contribuicao/politica-de-commits.md
+  - Tutoriais:
+    - Adaptação de Scrappers Existentes: tutorial/tutorialAdaptacao.md
+    - Criação de Novos Scrappers: tutorial/tutorialNovo.md
+  - Post Mortem: post_mortem/Post_mortem.md
+extra_css:
+  - styles/custom.css
+
+markdown_extensions:
+  - admonition
+  - codehilite
+  - footnotes
+  - toc:
+      permalink: true
+
+extra_javascript: []
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/lelamo2002/check-up

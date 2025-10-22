@@ -1,33 +1,14 @@
-*.py[co]
-*.sw[pno]
-.env
-collections/
-*.warc.*
-sessions/
-logs/
-__pycache__
-/data
-/screenshots
+# Ambiente virtual
+.venv/
+venv/
 
-# Cache directories
-.cache/
-.ipython/
+# Build gerado pelo MkDocs
+site/
 
-# Playwright browsers
-ms-playwright/
-
-# Python cache
-*.pyc
+# Arquivos Python
 __pycache__/
-.pytest_cache/
+*.py[cod]
 
-# IDEs
+# IDE/Editor
 .vscode/
 .idea/
-
-# Docker
-.dockerignore
-
-# OS
-.DS_Store
-Thumbs.db
