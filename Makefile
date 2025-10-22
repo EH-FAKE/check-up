@@ -82,6 +82,9 @@ scrape_uol:
 
 scrape_folha:
 	docker compose exec scraper python scrape_no_openai.py --platform folha.uol.com.br
+
+scrape_poder360:
+	docker compose exec scraper python scrape_no_openai.py --platform poder360.com.br
 	
 # Crawler para todos os portais ou específicos
 crawl:
@@ -112,6 +115,9 @@ crawl_ig:
 crawl_folha:
 	docker compose run scraper python crawl.py folhaspider
 
+crawl_poder360:
+	docker compose run scraper python crawl.py poder360
+
 # Workflow completo de coleta de URLs
 crawl_all_working:
 	@echo "Executando crawl de todos os portais funcionais..."
@@ -123,6 +129,7 @@ crawl_all_working:
 	@make crawl_aliadosBrasil
 	@make crawl_ig
 	@make crawl_folha
+	@make crawl_poder360
 	@echo "Crawl de todos os portais concluído!"
 
 # Workflow completo de scraping
@@ -136,6 +143,7 @@ scrape_all_working:
 	@make scrape_r7
 	@make scrape_uol
 	@make scrape_folha
+	@make scrape_poder360
 	@echo "Scraping de todos os portais concluído!"
 
 # Pipeline completo: crawl + scrape
@@ -182,6 +190,7 @@ help:
 	@echo "  make crawl_aliadosBrasil - Coleta URLs do portal AliadosBrasil"
 	@echo "  make crawl_ig          - Coleta URLs do portal IG"
 	@echo "  make crawl_folha       - Coleta URLs do portal Folha"
+	@echo "  make crawl_poder360    - Coleta URLs do portal Poder360"
 	@echo ""
 	@echo "=== COMANDOS DE SCRAPING (Extração de Anúncios) ==="
 	@echo "  make scrape_all_working - Executa scraping de todos os portais funcionais"
@@ -193,6 +202,7 @@ help:
 	@echo "  make scrape_r7          - Scraping do portal R7"
 	@echo "  make scrape_uol         - Scraping do portal UOL"
 	@echo "  make scrape_folha       - Scraping do portal Folha"
+	@echo "  make scrape_poder360   - Scraping do portal Poder360"
 	@echo ""
 	@echo "=== WORKFLOWS COMPLETOS ==="
 	@echo "  make pipeline_complete  - Executa crawl + scraping de todos os portais"
@@ -219,25 +229,24 @@ run-frontend:
 
 # Rodar backend (server-web) com Docker
 run-backend-docker:
-	docker-compose up server-web
+	docker compose up server-web
 
 # Rodar frontend (client-web) com Docker
 run-frontend-docker:
-	docker-compose up client-web
+	docker compose up client-web
 
 # Construir e rodar backend (server-web) com Docker
 build-backend-docker:
-	docker-compose up --build server-web
+	docker compose up --build server-web
 
 # Construir e rodar frontend (client-web) com Docker
 build-frontend-docker:
-	docker-compose up --build client-web
+	docker compose up --build client-web
 
 # Rodar todos os serviços (backend, frontend, minio, db, scraper)
 all:
-	docker-compose up -d
+	docker compose up -d
 
 # Parar todos os serviços
 down:
-	docker-compose down
-
+	docker compose down

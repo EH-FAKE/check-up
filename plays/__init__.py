@@ -11,6 +11,7 @@ from plays.uol import UOLPlay
 from plays.gazetaDoPovo import GazetaDoPovoPlay
 from plays.maisGoias import MaisGoias
 from plays.aliadosBrasil import AliadosBrasilPlay
+from plays.poder360 import Poder360Play
 
 __all__ = [
     ClicRBSPlay,
@@ -26,4 +27,5 @@ __all__ = [
     GazetaDoPovoPlay,
     MaisGoias,
     AliadosBrasilPlay,
+    Poder360Play,
 ]
