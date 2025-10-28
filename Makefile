@@ -65,7 +65,7 @@ scrape_metropoles:
 # Comando para verificação de instalação do Playwright
 test_playwright:
 	@echo "Verificando instalação do Playwright..."
-	docker compose exec scraper python -c "from playwright.sync_api import sync_playwright; print('Iniciando teste do Playwright'); p = sync_playwright().start(); print('Playwright iniciado com sucesso'); browser = p.firefox.launch(); print('Navegador lançado com sucesso'); page = browser.new_page(); print('Nova página criada'); page.goto('https://www.example.com'); print('Página carregada'); browser.close(); p.stop(); print('Teste do Playwright concluído com sucesso')"
+	docker compose run --rm scraper python -c "from playwright.sync_api import sync_playwright; print('Iniciando teste do Playwright'); p = sync_playwright().start(); print('Playwright iniciado com sucesso'); browser = p.firefox.launch(); print('Navegador lançado com sucesso'); page = browser.new_page(); print('Nova página criada'); page.goto('https://www.example.com'); print('Página carregada'); browser.close(); p.stop(); print('Teste do Playwright concluído com sucesso')"
 
 scrape_maisgoias:
 	docker compose exec scraper python scrape_no_openai.py --platform maisgoias.com.br
