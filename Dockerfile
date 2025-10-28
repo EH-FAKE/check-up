@@ -16,10 +16,11 @@ RUN /root/.local/bin/pipenv install scrapy-playwright==0.0.43
 # baixa SOMENTE os browsers (sem --with-deps aqui)
 RUN /root/.local/bin/pipenv run playwright install firefox
 
-# Confirma que playwright foi instalado corretamente
-RUN /usr/src/.venv/bin/python -c "import playwright; print(playwright)"
+# sanity check
+RUN /usr/src/.venv/bin/python -c "import playwright; print('Playwright OK')"
 
-# runtime
+
+# ========== runtime ==========
 FROM python:3.12.3-slim AS runtime
 
 # mesmo path de browsers no runtime
@@ -42,8 +43,7 @@ COPY --from=builder /ms-playwright/ /ms-playwright/
 
 ENV PATH=/usr/src/.venv/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PLAYWRIGHT_BROWSERS_PATH=/usr/src/.venv/pw-browsers
+    PYTHONUNBUFFERED=1
 
 WORKDIR /project
 
