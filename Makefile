@@ -1,4 +1,4 @@
-.PHONY: start scrape scrape_no_openai crawl crawl_metropoles init_db migrate_db setup bash env stop wait-for-db prune
+.PHONY: start scrape scrape_no_openai crawl crawl_metropoles init_db migrate_db setup bash env stop wait-for-db prune test_playwright
 
 # Configuração do ambiente
 env:
@@ -61,6 +61,11 @@ scrape_no_openai:
 # Scraping por plataforma específica (sem OpenAI)
 scrape_metropoles:
 	docker compose exec scraper python scrape_no_openai.py --platform metropoles.com
+
+# Comando para verificação de instalação do Playwright
+test_playwright:
+	@echo "Verificando instalação do Playwright..."
+	docker compose run --rm scraper python -c "from playwright.sync_api import sync_playwright; print('Iniciando teste do Playwright'); p = sync_playwright().start(); print('Playwright iniciado com sucesso'); browser = p.firefox.launch(); print('Navegador lançado com sucesso'); page = browser.new_page(); print('Nova página criada'); page.goto('https://www.example.com'); print('Página carregada'); browser.close(); p.stop(); print('Teste do Playwright concluído com sucesso')"
 
 scrape_maisgoias:
 	docker compose exec scraper python scrape_no_openai.py --platform maisgoias.com.br
@@ -170,6 +175,7 @@ collect: crawl_metropoles scrape_no_openai
 collect_working: crawl_all_working scrape_all_working
 	@echo "Coleta completa de todos os portais funcionais concluída!"
 
+
 # Exibir ajuda
 help:
 	@echo "Check-up - Ferramenta de análise de anúncios de saúde"
@@ -211,6 +217,7 @@ help:
 	@echo "  make init_db           - Inicializa as tabelas do banco de dados"
 	@echo "  make migrate_db        - Executa as migrações do banco de dados"
 	@echo "  make prune             - Remove containers, redes e imagens não utilizadas"
+	@echo "  make test_playwright   - Testa se a instalação do Playwright está funcionando"
 
 .PHONY: start scrape scrape_no_openai scrape_fixed scrape_working install run-backend run-frontend docker-run-backend docker-run-frontend docker-build-backend docker-build-frontend all stop down
 
