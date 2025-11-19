@@ -3,6 +3,7 @@ services:
     env_file: .env
     build:
       context: .
+    user: root
     container_name: healthcheck_scraper
     volumes:
       - .:/project/
