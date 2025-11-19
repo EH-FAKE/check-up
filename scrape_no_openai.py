@@ -161,6 +161,7 @@ def main():
             "description": getattr(entry_item, "description", None),
             "scraped_at": datetime.utcnow().isoformat(),
             "entry_id": entry.id,
+            "image_url": getattr(entry_item, "image_url", None),
             "ads": [
                 {"title": ad.title,
                     "url": ad.url,
@@ -171,7 +172,7 @@ def main():
                 for ad in entry_item.ads if ad.is_valid()
             ]
         }
-
+        logger.info(f"JSON PREPARED. Image URL: {article_data.get('image_url')}")
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         object_name = f"{PORTAL_FOLDER}/{timestamp}_{entry.id}.json"
 
