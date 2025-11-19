@@ -91,6 +91,9 @@ scrape_folha:
 scrape_jornaldaparaiba:
 	docker compose exec scraper python scrape_no_openai.py --platform jornaldaparaiba.com.br
 
+scrape_cidadeverde:
+	docker compose exec scraper python scrape_no_openai.py --platform cidadeverde.com
+
 	
 # Crawler para todos os portais ou específicos
 crawl:
@@ -124,6 +127,9 @@ crawl_folha:
 crawl_jornaldaparaiba:
 	docker compose run scraper python crawl.py jornaldaparaiba
 
+crawl_cidadeverde:
+	docker compose run scraper python crawl.py cidadeverdespider
+
 # Workflow completo de coleta de URLs
 crawl_all_working:
 	@echo "Executando crawl de todos os portais funcionais..."
@@ -136,6 +142,7 @@ crawl_all_working:
 	@make crawl_ig
 	@make crawl_folha
 	@make crawl_jornaldaparaiba
+	@make crawl_cidadeverde
 	@echo "Crawl de todos os portais concluído!"
 
 # Workflow completo de scraping
@@ -150,6 +157,7 @@ scrape_all_working:
 	@make scrape_uol
 	@make scrape_folha
 	@make scrape_jornaldaparaiba
+	@make scrape_cidadeverde
 	@echo "Scraping de todos os portais concluído!"
 
 # Pipeline completo: crawl + scrape
