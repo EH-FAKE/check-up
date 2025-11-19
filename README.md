@@ -175,36 +175,13 @@ As seguintes tabelas são criadas automaticamente durante o setup:
 
 ## 🧑‍💻 Desenvolvimento e Contribuição
 
-### 🐳 Build Docker e Troubleshooting
-- O `Dockerfile` usa multi-stage build com instalação automática dos browsers do Playwright
-- Para build manual: `docker build -t check-up:latest .`
-- Para acessar o container: `make bash`
+Quer contribuir para o projeto? Consulte nosso **[Guia de Contribuição](./.github/CONTRIBUTING.md)** completo que inclui:
 
-### 🧪 Estrutura de Spiders e Plays
-- Cada portal tem um spider Scrapy (`spiders/`) e um script Playwright (`plays/`)
-- Para adicionar novo portal, siga o modelo dos arquivos existentes
-- O scraping aceita argumentos de timeout e plataforma via CLI
-
-### 📚 Guias de Contribuição
-**⚠️ IMPORTANTE**: Antes de contribuir, leia os tutoriais apropriados:
-
-- **[TUTORIAL_CRIACAO_DO_ZERO.md](./TUTORIAL_CRIACAO_DO_ZERO.md)** - Para criar scrapers completamente novos:
-  - Guia passo-a-passo desde a análise do portal
-  - Exemplos práticos com código completo
-  - Troubleshooting e problemas comuns
-  - Testes e validação
-
-- **[TUTORIAL_SPIDERS_PLAYS.md](./TUTORIAL_SPIDERS_PLAYS.md)** - Para adaptar scrapers existentes:
-  - Guia para adaptar spiders e plays existentes
-  - Checklist de validação para garantir qualidade
-  - Exemplos práticos de boas práticas
-  - Dicas para identificar seletores atualizados
-
-### 📝 Fluxo de Contribuição
-- Siga as políticas de branches e commits do projeto
-- Use Conventional Commits e Git Flow
-- Sempre rode os testes antes de abrir PR
-- Nunca faça push direto para `main` ou `develop`
+- 🔄 Fluxo de contribuição
+- 🛠️ Como criar novos scrapers ou adaptar existentes
+- 🐛 Como reportar bugs e sugerir melhorias
+- 📚 Guias de estilo (commits e PRs)
+- 📋 Templates de issues e labels
 
 ## 🚨 Troubleshooting
 
