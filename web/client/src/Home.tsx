@@ -1,4 +1,4 @@
-// COMANDO PARA INSTALAR DEPENDÊNCIAS:
+// COMANDO PARA INSTALAR DEPENDÊNCIAS (caso não tenha):
 // npm install lucide-react dompurify
 // npm install -D @types/dompurify
 
@@ -28,6 +28,8 @@ import {
 } from "./components/ui/dialog";
 import { Skeleton } from "./components/ui/skeleton";
 import { cn } from "@/lib/utils"; 
+
+// Ícones
 import { Search, X, Newspaper, CalendarDays, Tags, ExternalLink, Star, Frown, Clock, Link as LinkIcon, Check } from "lucide-react"; 
 
 // Biblioteca de Segurança
@@ -60,47 +62,44 @@ function formatarNomePortal(portal: string) {
     const nome = portal.replace(/_/g, ".").toLowerCase();
     return nome.charAt(0).toUpperCase() + nome.slice(1);
 }
+
+// --- FUNÇÕES AUXILIARES ---
+
+function calcularTempoLeitura(texto: string | undefined) {
+    if (!texto) return "1 min";
+    const palavras = texto.split(/\s+/).length;
+    const minutos = Math.ceil(palavras / 200);
+    return `${minutos} min`;
+}
+
 function limparLixoVisual(html: string) {
     if (!html) return "";
     let linhas = html.split('\n');
-    let modoExclusao = false; 
-
+    let modoExclusao = false;
     const termosBanidos = [
         "FONTE/CRÉDITOS", "FONTE/CREDITOS",
         "CRÉDITOS (IMAGEM DE CAPA)", "CRÉDITOS:", "CREDITOS:", "FONTE:",
-        ,"PUBLICIDADE","MAIS LIDAS" // Tags soltas
+        "ECONOMIA  BOLSA  DOLAR"
     ];
-
-    // Filtra as linhas
     linhas = linhas.filter(linha => {
         const conteudo = linha.trim();
         const conteudoUpper = conteudo.toUpperCase();
-
-        // 1. Verifica se a linha começa o bloco "LEIA TAMBÉM"
         if (conteudoUpper.includes("LEIA TAMBÉM") || conteudoUpper.includes("LEIA TAMBEM")) {
             modoExclusao = true; 
             return false; 
         }
-
-        // 2. Se estivermos no modo de exclusão (logo após um LEIA TAMBÉM)
         if (modoExclusao) {
-            if (conteudo.length < 150 && conteudo.length > 0) {
+            if (conteudo.length < 200 && conteudo.length > 0) {
                 return false; 
-            } else if (conteudo.length >= 150) {
+            } else if (conteudo.length >= 200) {
                 modoExclusao = false; 
             }
         }
-
+        const temTermoBanido = termosBanidos.some(termo => conteudoUpper.includes(termo));
+        if (temTermoBanido) return false;
         return true;
     });
-
     return linhas.join('\n');
-}
-function calcularTempoLeitura(texto: string | undefined) {
-    if (!texto) return "1 min";
-    const palavras = texto.split(/\s+/).length;
-    const minutos = Math.ceil(palavras / 200); 
-    return `${minutos} min`;
 }
 
 const Home = () => {
@@ -115,8 +114,10 @@ const Home = () => {
     const [noticiaSelecionada, setNoticiaSelecionada] = useState<any | null>(null);
     const [dialogAberto, setDialogAberto] = useState(false);
     const [noticiasPorPortal, setNoticiasPorPortal] = useState<Record<string, number>>({});
-    const [tamanhoFonte, setTamanhoFonte] = useState("text-base"); 
-    const [copiadoId, setCopiadoId] = useState<string | null>(null); // Para feedback visual
+    
+    // --- ESTADO PARA O ZOOM DA FONTE (1 = 100%) ---
+    const [escalaFonte, setEscalaFonte] = useState(1); 
+    const [copiadoId, setCopiadoId] = useState<string | null>(null);
 
     // Estados para a seção de PORTAIS
     const [buscaPortal, setBuscaPortal] = useState("");
@@ -130,7 +131,7 @@ const Home = () => {
     
     const noticiasPorPagina = 10;
 
-    // --- LÓGICA DE FAVORITOS (Início) ---
+    // --- LÓGICA DE FAVORITOS ---
     const [favoritos, setFavoritos] = useState<any[]>(() => {
         try {
             const saved = localStorage.getItem("favoritos");
@@ -163,9 +164,6 @@ const Home = () => {
         setTimeout(() => setCopiadoId(null), 2000);
     }
 
-    // --- LÓGICA DE FAVORITOS (Fim) ---
-
-
     useEffect(() => {
         fetch(`${API_URL}/portais`)
             .then((res) => res.json())
@@ -174,17 +172,15 @@ const Home = () => {
             .finally(() => setLoading(false));
     }, []);
 
-    // Reseta paginação do PORTAL quando a busca ou portal muda
     useEffect(() => {
         setPaginaPortal(1); 
     }, [portalSelecionado, buscaPortal]);
 
-    // Reseta paginação dos FAVORITOS quando a busca de favoritos muda
     useEffect(() => {
         setPaginaFavoritos(1);
     }, [buscaFavoritos]);
 
-    // Busca notícias da API (para portais)
+    // Busca notícias
     useEffect(() => {
         if (!portalSelecionado || portalSelecionado === 'favoritos') {
             setNoticias([]);
@@ -214,7 +210,7 @@ const Home = () => {
         }
     }, [portalSelecionado, buscaPortal]);
 
-    // Calcula as Top Tags do PORTAL
+    // Tags Portal
     useEffect(() => {
         if (todasAsNoticiasDoPortal.length > 0) {
             const allTags = todasAsNoticiasDoPortal.flatMap(noticia => noticia.tags || []);
@@ -229,7 +225,7 @@ const Home = () => {
         }
     }, [todasAsNoticiasDoPortal]);
 
-    // Calcula as Top Tags dos FAVORITOS
+    // Tags Favoritos
     useEffect(() => {
         if (favoritos.length > 0) {
             const allTags = favoritos.flatMap(noticia => noticia.tags || []);
@@ -245,13 +241,12 @@ const Home = () => {
     }, [favoritos]);
 
 
-    // Paginação e dados para PORTAIS
+    // Paginação
     const totalPaginasPortal = Math.ceil(noticias.length / noticiasPorPagina);
     const inicioPortal = (paginaPortal - 1) * noticiasPorPagina;
     const fimPortal = inicioPortal + noticiasPorPagina;
     const noticiasPaginadasPortal = noticias.slice(inicioPortal, fimPortal);
 
-    // Filtro e Paginação para FAVORITOS
     const favoritosFiltrados = useMemo(() => {
         if (!buscaFavoritos.trim()) {
             return favoritos;
@@ -269,8 +264,7 @@ const Home = () => {
     const fimFavoritos = inicioFavoritos + noticiasPorPagina;
     const noticiasPaginadasFavoritos = favoritosFiltrados.slice(inicioFavoritos, fimFavoritos);
 
-
-    // Contagem de notícias (igual)
+    // Contagem
     useEffect(() => {
         const buscarContagemNoticias = async () => {
             const contagem: Record<string, number> = {};
@@ -291,7 +285,6 @@ const Home = () => {
         }
     }, [portais]);
 
-    // Handlers de clique 
     const handleTagClickPortal = (tag: string) => {
         setBuscaPortal(buscaPortal === tag ? "" : tag);
     };
@@ -302,15 +295,14 @@ const Home = () => {
 
     const handlePortalChange = (novoPortal: string) => {
         setPortalSelecionado(novoPortal);
-        setBuscaPortal(""); // Limpa ambas as buscas
+        setBuscaPortal("");
         setBuscaFavoritos("");
     };
 
-    // Agora é uma função que aceita parâmetros
+    // Paginação Helper
     const getPaginationRange = (totalPages: number, currentPage: number) => {
         const siblingCount = 1;
         const totalPageNumbers = siblingCount + 5; 
-
         if (totalPageNumbers >= totalPages) {
             return Array.from({ length: totalPages }, (_, i) => i + 1);
         }
@@ -320,7 +312,6 @@ const Home = () => {
         const shouldShowRightDots = rightSiblingIndex < totalPages - 2;
         const firstPageIndex = 1;
         const lastPageIndex = totalPages;
-
         if (!shouldShowLeftDots && shouldShowRightDots) {
             let leftItemCount = 3 + 2 * siblingCount;
             let leftRange = Array.from({ length: leftItemCount }, (_, i) => i + 1);
@@ -338,7 +329,6 @@ const Home = () => {
         return [];
     };
     
-    // Geradores de números de página
     const pageNumbersPortal = getPaginationRange(totalPaginasPortal, paginaPortal);
     const pageNumbersFavoritos = getPaginationRange(totalPaginasFavoritos, paginaFavoritos);
     
@@ -352,7 +342,7 @@ const Home = () => {
                     }}>
                         <DialogTrigger asChild>
                             <Card 
-                                className="cursor-pointer hover:shadow-lg transition-shadow flex flex-col justify-between min-h-[200px] relative"
+                                className="cursor-pointer py-0 hover:shadow-lg transition-shadow flex flex-col justify-between min-h-[200px] relative group overflow-hidden rounded-xl border bg-card text-card-foreground"
                                 onClick={() => {
                                     setNoticiaSelecionada(noticia);
                                     setDialogAberto(true);
@@ -361,58 +351,76 @@ const Home = () => {
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    className="absolute top-2 right-2 z-10 h-8 w-8 rounded-full bg-black/10 hover:bg-black/20"
+                                    className="absolute top-2 right-2 z-50 h-8 w-8 rounded-full bg-black/40 hover:bg-black/60 text-white transition-colors duration-200"
                                     onClick={(e) => {
                                         e.stopPropagation(); 
                                         handleToggleFavorito(noticia);
                                     }}
                                 >
                                     <Star className={cn(
-                                        "h-5 w-5 text-white transition-all",
+                                        "h-5 w-5 transition-all",
                                         isNoticiaFavorita(noticia) 
                                             ? "fill-yellow-400 text-yellow-400" 
-                                            : "fill-transparent"
+                                            : "fill-transparent text-white"
                                     )} />
                                 </Button>
-                                <div>
-                                    <CardHeader>
-                                        <CardTitle className="text-lg pr-10">{noticia.title}</CardTitle>
-                                    </CardHeader>
-                                    {noticia.description && (
-                                        <CardContent>
-                                            <p className="text-zinc-700 text-sm line-clamp-3 leading-relaxed">{noticia.description}</p>
-                                        </CardContent>
-                                    )}
-                                </div>
-                                <CardFooter className="flex flex-col gap-4 pt-4">
-                                    <div className="flex flex-row justify-between items-center w-full">
-                                        {noticia.date ? (
-                                            <span className="text-xs text-zinc-500">
-                                                {new Date(noticia.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
-                                            </span>
-                                        ) : <div />}
-                                        
-                                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                            <Clock className="w-3 h-3" />
-                                            {calcularTempoLeitura(noticia.body || noticia.description)}
-                                        </div>
+
+                                {noticia.image_url && (
+                                    <div className="w-full h-48 relative">
+                                        <img 
+                                            src={noticia.image_url} 
+                                            alt={noticia.title}
+                                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                            onError={(e) => {
+                                                (e.target as HTMLImageElement).style.display = 'none';
+                                                e.currentTarget.parentElement!.style.display = 'none';
+                                            }}
+                                        />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent pointer-events-none" />
                                     </div>
+                                )}
+
+                                <div className="flex flex-col flex-grow">
+                                    <CardHeader className="px-6 pt-6 pb-2 space-y-0">
+                                        <CardTitle className="text-lg leading-tight font-bold line-clamp-3 mb-2">
+                                            {noticia.title}
+                                        </CardTitle>
+                                        {noticia.description && (
+                                            <p className="text-muted-foreground text-sm line-clamp-3 leading-relaxed">
+                                                {noticia.description}
+                                            </p>
+                                        )}
+                                    </CardHeader>
                                     
-                                    {noticia.tags && noticia.tags.length > 0 && (
-                                        <div className="flex flex-wrap gap-1 justify-end w-full">
-                                            {noticia.tags.slice(0, 2).map((tag: string, tagIdx: number) => (
-                                                <Badge key={tagIdx} variant="secondary" className="text-xs">
-                                                    {tag}
-                                                </Badge>
-                                            ))}
-                                            {noticia.tags.length > 2 && (
-                                                <Badge variant="outline" className="text-xs">
-                                                    +{noticia.tags.length - 2}
-                                                </Badge>
-                                            )}
+                                    <div className="flex-grow" />
+
+                                    <CardFooter className="px-6 pb-6 pt-4 flex flex-col gap-4 mt-auto">
+                                        <div className="flex flex-row justify-between items-center w-full text-xs text-muted-foreground">
+                                            <span className="capitalize font-medium">
+                                                {noticia.date ? new Date(noticia.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' }) : ""}
+                                            </span>
+                                            <div className="flex items-center gap-1">
+                                                <Clock className="w-3 h-3" />
+                                                {calcularTempoLeitura(noticia.body || noticia.description)}
+                                            </div>
                                         </div>
-                                    )}
-                                </CardFooter>
+                                        
+                                        {noticia.tags && noticia.tags.length > 0 && (
+                                            <div className="flex flex-wrap gap-1.5 justify-end w-full">
+                                                {noticia.tags.slice(0, 2).map((tag: string, tagIdx: number) => (
+                                                    <Badge key={tagIdx} variant="secondary" className="text-[10px] px-2 py-0.5 font-medium uppercase tracking-wide">
+                                                        {tag}
+                                                    </Badge>
+                                                ))}
+                                                {noticia.tags.length > 2 && (
+                                                    <Badge variant="outline" className="text-[10px] px-2 py-0.5">
+                                                        +{noticia.tags.length - 2}
+                                                    </Badge>
+                                                )}
+                                            </div>
+                                        )}
+                                    </CardFooter>
+                                </div>
                             </Card>
                         </DialogTrigger>
 
@@ -425,15 +433,35 @@ const Home = () => {
                                             {calcularTempoLeitura(noticia.body || noticia.description)} de leitura
                                         </span>
                                     </div>
-                                    <div className="flex gap-1 items-center">
-                                        <span className="text-xs text-muted-foreground mr-2">Tamanho da fonte:</span>
-                                        <Button variant="ghost" size="sm" className="h-6 w-8 p-0 text-xs" onClick={() => setTamanhoFonte("text-sm")}>A-</Button>
-                                        <Button variant="ghost" size="sm" className="h-6 w-8 p-0 text-xs font-bold" onClick={() => setTamanhoFonte("text-base")}>A</Button>
-                                        <Button variant="ghost" size="sm" className="h-6 w-8 p-0 text-sm font-bold" onClick={() => setTamanhoFonte("text-lg")}>A+</Button>
+                                    
+                                    {/* CONTROLE DE FONTE USANDO ESTADO NUMÉRICO */}
+                                    <div className="flex gap-1 items-center bg-muted/30 rounded-md px-1">
+                                        <span className="text-[10px] text-muted-foreground mr-2 uppercase tracking-wider font-bold">Fonte:</span>
+                                        <Button 
+                                            variant={escalaFonte === 0.85 ? "secondary" : "ghost"} 
+                                            size="sm" className="h-6 w-6 p-0 text-xs" 
+                                            onClick={() => setEscalaFonte(0.85)}
+                                        >
+                                            A-
+                                        </Button>
+                                        <Button 
+                                            variant={escalaFonte === 1 ? "secondary" : "ghost"} 
+                                            size="sm" className="h-6 w-6 p-0 text-xs font-bold" 
+                                            onClick={() => setEscalaFonte(1)}
+                                        >
+                                            A
+                                        </Button>
+                                        <Button 
+                                            variant={escalaFonte === 1.15 ? "secondary" : "ghost"} 
+                                            size="sm" className="h-6 w-6 p-0 text-sm font-bold" 
+                                            onClick={() => setEscalaFonte(1.15)}
+                                        >
+                                            A+
+                                        </Button>
                                     </div>
                                 </div>
 
-                                <DialogTitle>{noticia.title}</DialogTitle>
+                                <DialogTitle className="text-2xl font-serif leading-tight font-bold">{noticia.title}</DialogTitle>
                                 <DialogDescription asChild>
                                     <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm pt-2">
                                         {noticia.date && (
@@ -446,44 +474,51 @@ const Home = () => {
                                             <div className="flex items-center gap-2">
                                                 <Tags className="w-4 h-4" />
                                                 <span className="font-medium">Tags:</span>
-                                                <span className="text-zinc-800">{noticia.tags.join(', ')}</span>
+                                                <span className="text-zinc-800">{noticia.tags.slice(0, 3).join(', ')}</span>
                                             </div>
                                         )}
                                     </div>
                                 </DialogDescription>
                             </DialogHeader>
+
                             <div className="p-6 overflow-y-auto">
                                 <div className="space-y-6">
                                     {noticia.description && (
-                                        <p className={`text-zinc-800 italic leading-relaxed border-l-4 pl-4 ${tamanhoFonte}`}>
+                                        <p className="text-zinc-600 font-serif text-lg italic leading-relaxed border-l-4 border-zinc-300 pl-4 bg-zinc-50 py-3 pr-2 rounded-r-lg">
                                             {noticia.description}
                                         </p>
                                     )}
+                                    
                                     {noticia.body && (
-                                    <div className="mt-4">
-                                        <div 
-                                            className="
-                                                prose prose-lg max-w-none 
-                                                prose-zinc dark:prose-invert
-                                                font-serif text-slate-700 dark:text-slate-300
-                                                leading-normal
-                                                first-letter:text-7xl first-letter:font-bold first-letter:text-black dark:first-letter:text-white first-letter:mr-3 first-letter:float-left first-letter:leading-[0.8]
-                                                prose-strong:font-bold prose-strong:text-slate-900 dark:prose-strong:text-slate-100
-                                                prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline
-                                                whitespace-pre-line
-                                            "
-                                            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(limparLixoVisual(noticia.body)) }} 
-                                        />
-                                    </div>
+                                        <div>
+                                            {/* AQUI ESTÁ A MÁGICA: O estilo inline 'fontSize' controla tudo proporcionalmente */}
+                                            <div 
+                                                className={`
+                                                    prose prose-zinc max-w-none 
+                                                    prose-lg /* Base robusta */
+                                                    font-serif text-slate-700 dark:text-slate-300
+                                                    text-justify whitespace-pre-line leading-relaxed
+                                                    prose-p:mb-4 prose-p:mt-0
+                                                    
+                                                    /* Estilo de Revista */
+                                                    first-letter:text-7xl first-letter:font-bold first-letter:text-black 
+                                                    first-letter:mr-3 first-letter:float-left first-letter:leading-[0.8]
+                                                    
+                                                    transition-all duration-200 ease-in-out
+                                                `}
+                                                style={{ fontSize: `${escalaFonte}em` }} 
+                                                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(limparLixoVisual(noticia.body)) }} 
+                                            />
+                                        </div>
                                     )}
                                 </div>
-                            </div> 
+                            </div>
+
                             {noticia.url && (
-                                <DialogFooter className="gap-2">
-                                    {/* Botão Copiar Link */}
+                                <DialogFooter className="gap-2 border-t pt-4">
                                     <Button 
                                         variant="outline" 
-                                        onClick={() => handleCopiarLink(noticia.url, noticia.url)} 
+                                        onClick={() => handleCopiarLink(noticia.url, noticia.url)}
                                     >
                                         {copiadoId === noticia.url ? (
                                             <>
@@ -506,7 +541,6 @@ const Home = () => {
                                     </Button>
                                 </DialogFooter>
                             )}
-
                         </DialogContent>
                     </Dialog>
                 ))}
@@ -514,13 +548,12 @@ const Home = () => {
         );
     };
 
-    // ESTADO DE LOADING (igual)
+    // ESTADO DE LOADING
     if (loading) return (
         <div className="max-w-5xl mx-auto p-8"> 
             <h1 className="text-2xl font-bold mb-4">
                 Selecione um portal de notícias
             </h1>
-            {/* ... (skeleton) ... */}
             <div className="space-y-6">
                 <div className="mx-auto flex w-full max-w-4xl bg-gray-200 rounded-md mb-6">
                     {Array.from({ length: 4 }, (_, idx) => (
@@ -555,10 +588,8 @@ const Home = () => {
         </div>
     );
     
-    // ESTADO DE ERRO (igual)
     if (erro) return <div className="p-8 text-red-500">{erro}</div>;
 
-    // ESTADO PRINCIPAL (CARREGADO)
     return (
         <div className="max-w-5xl mx-auto p-8">
             <h1 className="text-2xl font-bold mb-4">
@@ -599,7 +630,6 @@ const Home = () => {
                         ))}
                     </TabsList>
                     
-                    {/* Estado de Boas-Vindas (igual) */}
                     {!portalSelecionado && (
                         <div className="text-center p-16 border-2 border-dashed rounded-lg mt-6 bg-slate-50">
                             <Newspaper className="w-16 h-16 mx-auto mt-4 text-zinc-400 mb-6" />
@@ -612,7 +642,6 @@ const Home = () => {
                         </div>
                     )}
 
-                    {/* Conteúdo dos Portais */}
                     {portais.map((portal) => (
                         <TabsContent key={portal} value={portal}>
                             <div className="mb-2 font-semibold">
@@ -688,7 +717,6 @@ const Home = () => {
                                         <RenderNoticiasGrid noticiasParaRenderizar={noticiasPaginadasPortal} />
                                     )}
 
-                                    {/* Paginação do PORTAL */}
                                     {totalPaginasPortal > 1 && (
                                         <div className="flex items-center justify-between gap-3 mt-6">
                                             <p className="text-muted-foreground grow text-sm" aria-live="polite">
@@ -735,7 +763,6 @@ const Home = () => {
                         </TabsContent>
                     ))}
 
-                    {/* --- CONTEÚDO DA ABA FAVORITOS --- */}
                     <TabsContent value="favoritos">
                         <div className="mb-2 font-semibold">
                             Seção selecionada: <span className="text-yellow-600">Favoritos</span>
@@ -752,7 +779,6 @@ const Home = () => {
                                 </p>
                             </div>
                         ) : (
-                            // Layout de 2 colunas para favoritos
                             <div className="flex flex-col md:flex-row gap-8 mt-4">
                                 <aside className="w-full md:w-1/4 lg:w-1/5">
                                     <h3 className="font-semibold mb-4 text-lg">Tags Salvas</h3>
@@ -801,7 +827,6 @@ const Home = () => {
                                         <RenderNoticiasGrid noticiasParaRenderizar={noticiasPaginadasFavoritos} />
                                     )}
 
-                                    {/* Paginação dos FAVORITOS */}
                                     {totalPaginasFavoritos > 1 && (
                                         <div className="flex items-center justify-between gap-3 mt-6">
                                             <p className="text-muted-foreground grow text-sm" aria-live="polite">

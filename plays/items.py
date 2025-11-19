@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 
 
 @dataclass
@@ -30,6 +30,7 @@ class EntryItem:
     description: str | None = None
     body: str | None = None
     tags: List[str] | None = None
+    image_url: Optional[str] = None
 
     def __post_init__(self):
         if self.ads is None:

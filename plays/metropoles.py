@@ -1,11 +1,8 @@
 import time
-
 from playwright.sync_api import sync_playwright
-
 from plays.base import BasePlay
 from plays.items import EntryItem
 from plog import logger
-
 
 class MetropolesPlay(BasePlay):
     name = "metropoles"
@@ -25,11 +22,19 @@ class MetropolesPlay(BasePlay):
             page.goto(self.url, timeout=180_000)
             
             # Wait for the main content to be visible
-            page.wait_for_selector("h1", timeout=30000)
+            try:
+                page.wait_for_selector("h1", timeout=30000)
+            except Exception as e:
+                logger.error(f"[{self.name}] Timeout waiting for h1: {str(e)}")
+                # Opcional: retornar item vazio ou lançar erro
             
             # Extract article content
-            entry_title = page.locator("//h1").first.inner_text()
-            
+            entry_title = ""
+            try:
+                entry_title = page.locator("//h1").first.inner_text()
+            except Exception:
+                logger.warning(f"[{self.name}] Failed to extract title")
+
             # Extract description from noticiaCabecalho__subtitulo
             description = ""
             try:
@@ -37,6 +42,39 @@ class MetropolesPlay(BasePlay):
             except Exception:
                 logger.warning(f"[{self.name}] Failed to extract description")
             
+            # --- NOVO: EXTRAÇÃO DE IMAGEM (THUMBNAIL) ---
+            image_url = ""
+            try:
+                # Tentativa 1: Meta tag og:image (Padrão Ouro)
+                image_url = page.locator('meta[property="og:image"]').get_attribute("content")
+                logger.info(f"[{self.name}] Image found via og:image")
+            except Exception:
+                pass
+
+            if not image_url:
+                try:
+                    # Tentativa 2: Tag de link image_src (usada pelo Google)
+                    image_url = page.locator('link[rel="image_src"]').get_attribute("href")
+                    logger.info(f"[{self.name}] Image found via link rel")
+                except Exception:
+                    pass
+            
+            if not image_url:
+                try:
+                    # Tentativa 3: Primeira imagem dentro do article ou figure
+                    # Procura imagens grandes para evitar ícones
+                    imgs = page.locator("article img")
+                    count = imgs.count()
+                    for i in range(count):
+                        src = imgs.nth(i).get_attribute("src")
+                        if src and ("jpg" in src or "png" in src or "webp" in src):
+                             image_url = src
+                             logger.info(f"[{self.name}] Image found via article img fallback")
+                             break
+                except Exception:
+                    pass
+            # --- FIM DA EXTRAÇÃO DE IMAGEM ---
+
             # Extract article body with multiple attempts
             body = ""
             try:
@@ -76,11 +114,11 @@ class MetropolesPlay(BasePlay):
                         tags.append(tag_text)
             except Exception:
                 logger.warning(f"[{self.name}] Failed to extract tags")
-
             return EntryItem(
                 title=entry_title,
                 url=self.url,
                 description=description,
                 body=body,
                 tags=tags,
+                image_url=image_url  
             )
