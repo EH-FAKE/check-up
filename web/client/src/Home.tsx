@@ -1,3 +1,6 @@
+// COMANDO PARA INSTALAR DEPENDÊNCIAS:
+// npm install lucide-react dompurify
+// npm install -D @types/dompurify
 
 import { useEffect, useMemo, useState } from "react"; 
 import { Button } from "./components/ui/button";
@@ -25,9 +28,7 @@ import {
 } from "./components/ui/dialog";
 import { Skeleton } from "./components/ui/skeleton";
 import { cn } from "@/lib/utils"; 
-
-// Ícones
-import { Search, X, Newspaper, CalendarDays, Tags, ExternalLink, Star, Frown} from "lucide-react"; 
+import { Search, X, Newspaper, CalendarDays, Tags, ExternalLink, Star, Frown, Clock, Link as LinkIcon, Check } from "lucide-react"; 
 
 // Biblioteca de Segurança
 import DOMPurify from 'dompurify';
@@ -42,7 +43,6 @@ import  aliadosbrasil from './public/assets/aliadosbrasil.jpeg'
 import  ig from './public/assets/IG.png'
 import  folha from './public/assets/folha.jpeg'
 
-
 const API_URL = "http://localhost:8000"
 
 const portalIcons: Record<string, string> = {
@@ -56,10 +56,51 @@ const portalIcons: Record<string, string> = {
     folha_uol_com_br: folha,
 };
 
-
 function formatarNomePortal(portal: string) {
     const nome = portal.replace(/_/g, ".").toLowerCase();
     return nome.charAt(0).toUpperCase() + nome.slice(1);
+}
+function limparLixoVisual(html: string) {
+    if (!html) return "";
+    let linhas = html.split('\n');
+    let modoExclusao = false; 
+
+    const termosBanidos = [
+        "FONTE/CRÉDITOS", "FONTE/CREDITOS",
+        "CRÉDITOS (IMAGEM DE CAPA)", "CRÉDITOS:", "CREDITOS:", "FONTE:",
+        ,"PUBLICIDADE","MAIS LIDAS" // Tags soltas
+    ];
+
+    // Filtra as linhas
+    linhas = linhas.filter(linha => {
+        const conteudo = linha.trim();
+        const conteudoUpper = conteudo.toUpperCase();
+
+        // 1. Verifica se a linha começa o bloco "LEIA TAMBÉM"
+        if (conteudoUpper.includes("LEIA TAMBÉM") || conteudoUpper.includes("LEIA TAMBEM")) {
+            modoExclusao = true; 
+            return false; 
+        }
+
+        // 2. Se estivermos no modo de exclusão (logo após um LEIA TAMBÉM)
+        if (modoExclusao) {
+            if (conteudo.length < 150 && conteudo.length > 0) {
+                return false; 
+            } else if (conteudo.length >= 150) {
+                modoExclusao = false; 
+            }
+        }
+
+        return true;
+    });
+
+    return linhas.join('\n');
+}
+function calcularTempoLeitura(texto: string | undefined) {
+    if (!texto) return "1 min";
+    const palavras = texto.split(/\s+/).length;
+    const minutos = Math.ceil(palavras / 200); 
+    return `${minutos} min`;
 }
 
 const Home = () => {
@@ -74,8 +115,9 @@ const Home = () => {
     const [noticiaSelecionada, setNoticiaSelecionada] = useState<any | null>(null);
     const [dialogAberto, setDialogAberto] = useState(false);
     const [noticiasPorPortal, setNoticiasPorPortal] = useState<Record<string, number>>({});
-    
- 
+    const [tamanhoFonte, setTamanhoFonte] = useState("text-base"); 
+    const [copiadoId, setCopiadoId] = useState<string | null>(null); // Para feedback visual
+
     // Estados para a seção de PORTAIS
     const [buscaPortal, setBuscaPortal] = useState("");
     const [paginaPortal, setPaginaPortal] = useState(1);
@@ -114,6 +156,13 @@ const Home = () => {
             setFavoritos(prev => [noticia, ...prev]); 
         }
     };
+
+    const handleCopiarLink = (url: string, id: string) => {
+        navigator.clipboard.writeText(url);
+        setCopiadoId(id);
+        setTimeout(() => setCopiadoId(null), 2000);
+    }
+
     // --- LÓGICA DE FAVORITOS (Fim) ---
 
 
@@ -335,15 +384,22 @@ const Home = () => {
                                         </CardContent>
                                     )}
                                 </div>
-                                <CardFooter className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 pt-4">
-                                    {noticia.date ? (
-                                        <span className="text-xs text-zinc-500">
-                                            {new Date(noticia.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
-                                        </span>
-                                    ) : <div />}
+                                <CardFooter className="flex flex-col gap-4 pt-4">
+                                    <div className="flex flex-row justify-between items-center w-full">
+                                        {noticia.date ? (
+                                            <span className="text-xs text-zinc-500">
+                                                {new Date(noticia.date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                                            </span>
+                                        ) : <div />}
+                                        
+                                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                            <Clock className="w-3 h-3" />
+                                            {calcularTempoLeitura(noticia.body || noticia.description)}
+                                        </div>
+                                    </div>
                                     
                                     {noticia.tags && noticia.tags.length > 0 && (
-                                        <div className="flex flex-wrap gap-1 justify-end max-w-xs">
+                                        <div className="flex flex-wrap gap-1 justify-end w-full">
                                             {noticia.tags.slice(0, 2).map((tag: string, tagIdx: number) => (
                                                 <Badge key={tagIdx} variant="secondary" className="text-xs">
                                                     {tag}
@@ -359,8 +415,24 @@ const Home = () => {
                                 </CardFooter>
                             </Card>
                         </DialogTrigger>
+
                         <DialogContent>
                             <DialogHeader>
+                                <div className="flex items-center justify-between border-b pb-2 mb-2">
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                        <span className="flex items-center gap-1">
+                                            <Clock className="w-3 h-3" /> 
+                                            {calcularTempoLeitura(noticia.body || noticia.description)} de leitura
+                                        </span>
+                                    </div>
+                                    <div className="flex gap-1 items-center">
+                                        <span className="text-xs text-muted-foreground mr-2">Tamanho da fonte:</span>
+                                        <Button variant="ghost" size="sm" className="h-6 w-8 p-0 text-xs" onClick={() => setTamanhoFonte("text-sm")}>A-</Button>
+                                        <Button variant="ghost" size="sm" className="h-6 w-8 p-0 text-xs font-bold" onClick={() => setTamanhoFonte("text-base")}>A</Button>
+                                        <Button variant="ghost" size="sm" className="h-6 w-8 p-0 text-sm font-bold" onClick={() => setTamanhoFonte("text-lg")}>A+</Button>
+                                    </div>
+                                </div>
+
                                 <DialogTitle>{noticia.title}</DialogTitle>
                                 <DialogDescription asChild>
                                     <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm pt-2">
@@ -380,29 +452,52 @@ const Home = () => {
                                     </div>
                                 </DialogDescription>
                             </DialogHeader>
-
-                            {/* --- CORREÇÃO 2: FECHAMENTO DA DIV --- */}
                             <div className="p-6 overflow-y-auto">
                                 <div className="space-y-6">
                                     {noticia.description && (
-                                        <p className="text-lg text-zinc-800 italic leading-relaxed border-l-4 pl-4">
+                                        <p className={`text-zinc-800 italic leading-relaxed border-l-4 pl-4 ${tamanhoFonte}`}>
                                             {noticia.description}
                                         </p>
                                     )}
                                     {noticia.body && (
-                                        <div>
-                                            <h4 className="font-semibold mb-3 text-lg">Conteúdo Completo</h4>
-                                            <div 
-                                                className="prose prose-zinc max-w-none prose-sm sm:prose-base text-justify whitespace-pre-line prose-p:my-2"
-                                                dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(noticia.body) }} 
-                                            />
-                                        </div>
+                                    <div className="mt-4">
+                                        <div 
+                                            className="
+                                                prose prose-lg max-w-none 
+                                                prose-zinc dark:prose-invert
+                                                font-serif text-slate-700 dark:text-slate-300
+                                                leading-normal
+                                                first-letter:text-7xl first-letter:font-bold first-letter:text-black dark:first-letter:text-white first-letter:mr-3 first-letter:float-left first-letter:leading-[0.8]
+                                                prose-strong:font-bold prose-strong:text-slate-900 dark:prose-strong:text-slate-100
+                                                prose-a:text-blue-600 prose-a:no-underline hover:prose-a:underline
+                                                whitespace-pre-line
+                                            "
+                                            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(limparLixoVisual(noticia.body)) }} 
+                                        />
+                                    </div>
                                     )}
                                 </div>
                             </div> 
-
                             {noticia.url && (
-                                <DialogFooter>
+                                <DialogFooter className="gap-2">
+                                    {/* Botão Copiar Link */}
+                                    <Button 
+                                        variant="outline" 
+                                        onClick={() => handleCopiarLink(noticia.url, noticia.url)} 
+                                    >
+                                        {copiadoId === noticia.url ? (
+                                            <>
+                                                <Check className="w-4 h-4 mr-2 text-green-600" />
+                                                Copiado!
+                                            </>
+                                        ) : (
+                                            <>
+                                                <LinkIcon className="w-4 h-4 mr-2" />
+                                                Copiar Link
+                                            </>
+                                        )}
+                                    </Button>
+
                                     <Button asChild variant="default">
                                         <a href={noticia.url} target="_blank" rel="noopener noreferrer">
                                             Ver Notícia Original

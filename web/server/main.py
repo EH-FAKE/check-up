@@ -45,7 +45,6 @@ def ping():
 
 @app.get("/portais", response_model=List[str])
 def listar_portais():
-    # Lista os prefixos (portais) diretamente do MinIO
     portais = set()
     try:
         objetos = minio_client.list_objects(MINIO_BUCKET, recursive=False)
@@ -54,18 +53,32 @@ def listar_portais():
                 nome_portal = obj.object_name.rstrip('/')
                 portais.add(nome_portal)
             else:
-                # Caso não venha como diretório, extrai o prefixo do nome do
-                # objeto
                 partes = obj.object_name.split('/')
                 if len(partes) > 1:
                     portais.add(partes[0])
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Erro ao acessar o MinIO: {
-                str(e)}")
+            detail=f"Erro ao acessar o MinIO: {str(e)}")
     return sorted(list(portais))
 
+# --- FUNÇÃO AUXILIAR PARA TRATAR DATA ---
+def processar_data_noticia(noticia):
+    data_str = (
+        noticia.get('date') or 
+        noticia.get('publishedAt') or 
+        noticia.get('createdAt') or 
+        noticia.get('scraped_at') 
+    )
+    if data_str:
+        noticia['date'] = data_str 
+        try:
+            data_limpa = data_str[:19] 
+            return datetime.fromisoformat(data_limpa)
+        except Exception:
+            pass
+    
+    return datetime.min
 
 @app.get("/noticias/{portal}")
 def listar_noticias(
@@ -84,33 +97,21 @@ def listar_noticias(
                         MINIO_BUCKET, obj.object_name)
                     conteudo = response.read()
                     noticia = json.loads(conteudo.decode('utf-8'))
-                    # Padronizar campo de data
-                    data_str = noticia.get('date') or noticia.get(
-                        'publishedAt') or noticia.get('createdAt')
-                    if data_str:
-                        try:
-                            data = datetime.fromisoformat(data_str[:10])
-                            noticia['_data'] = data
-                        except Exception:
-                            noticia['_data'] = datetime.min
-                    else:
-                        noticia['_data'] = datetime.min
+                    noticia['_data_ordenacao'] = processar_data_noticia(noticia)
+                    
                     noticias.append(noticia)
                 except Exception:
                     continue
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Erro ao acessar o MinIO: {
-                str(e)}")
+            detail=f"Erro ao acessar o MinIO: {str(e)}")
 
     # Ordenação
     reverse = order == 'desc'
-    noticias.sort(key=lambda n: n['_data'], reverse=reverse)
-
-    # Remover campo auxiliar
+    noticias.sort(key=lambda n: n['_data_ordenacao'], reverse=reverse)
     for n in noticias:
-        n.pop('_data', None)
+        n.pop('_data_ordenacao', None)
 
     return noticias
 
@@ -134,40 +135,32 @@ def buscar_noticias(
                         MINIO_BUCKET, obj.object_name)
                     conteudo = response.read()
                     noticia = json.loads(conteudo.decode('utf-8'))
-                    # Busca em título, descrição, body e tags
+                    
                     campos = [
                         str(noticia.get('title', '')),
                         str(noticia.get('description', '')),
                         str(noticia.get('body', '')),
                         ' '.join(noticia.get('tags', []) or [])
                     ]
+                    
                     if any(termo in campo.lower() for campo in campos):
-                        # Padronizar campo de data
-                        data_str = noticia.get('date') or noticia.get(
-                            'publishedAt') or noticia.get('createdAt')
-                        if data_str:
-                            try:
-                                data = datetime.fromisoformat(data_str[:10])
-                                noticia['_data'] = data
-                            except Exception:
-                                noticia['_data'] = datetime.min
-                        else:
-                            noticia['_data'] = datetime.min
+                        # Usa a mesma função auxiliar
+                        noticia['_data_ordenacao'] = processar_data_noticia(noticia)
                         resultados.append(noticia)
+                        
                 except Exception:
                     continue
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Erro ao acessar o MinIO: {
-                str(e)}")
+            detail=f"Erro ao acessar o MinIO: {str(e)}")
 
     # Ordenação
     reverse = order == 'desc'
-    resultados.sort(key=lambda n: n['_data'], reverse=reverse)
+    resultados.sort(key=lambda n: n['_data_ordenacao'], reverse=reverse)
 
     # Remover campo auxiliar
     for n in resultados:
-        n.pop('_data', None)
+        n.pop('_data_ordenacao', None)
 
     return resultados
