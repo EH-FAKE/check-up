@@ -14,7 +14,7 @@ RUN /root/.local/bin/pipenv install minio==7.2.15
 RUN /root/.local/bin/pipenv install scrapy-playwright==0.0.43
 
 # baixa SOMENTE os browsers (sem --with-deps aqui)
-RUN /root/.local/bin/pipenv run playwright install firefox
+RUN PLAYWRIGHT_BROWSERS_PATH=/ms-playwright /root/.local/bin/pipenv run playwright install firefox
 
 # Confirma que playwright foi instalado corretamente
 RUN /usr/src/.venv/bin/python -c "import playwright; print(playwright)"
@@ -43,7 +43,7 @@ COPY --from=builder /ms-playwright/ /ms-playwright/
 ENV PATH=/usr/src/.venv/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PLAYWRIGHT_BROWSERS_PATH=/usr/src/.venv/pw-browsers
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 WORKDIR /project
 
