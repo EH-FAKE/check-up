@@ -1,4 +1,5 @@
 from spiders.base import BaseSpider
+from spiders.brasilDeFato import BrasilDeFatoSpider
 from spiders.estadao import EstadaoSpider
 from spiders.folha import FolhaSpider
 from spiders.globo import GloboSpider
@@ -15,6 +16,7 @@ from spiders.aliadosBrasil import AliadosBrasilSpider
 
 __all__ = [
     BaseSpider,
+    BrasilDeFatoSpider,
     EstadaoSpider,
     FolhaSpider,
     GloboSpider,

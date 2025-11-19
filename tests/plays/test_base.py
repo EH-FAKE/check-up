@@ -3,6 +3,7 @@ from freezegun import freeze_time
 
 from plays.base import BasePlay
 from plays import (
+    BrasilDeFatoPlay,
     ClicRBSPlay,
     EstadaoPlay,
     FolhaPlay,
@@ -96,6 +97,14 @@ class TestBasePlay:
         scraper = BasePlay.get_scraper(url)
 
         assert isinstance(scraper, R7Play)
+        assert scraper.url == url
+
+    def test_return_correct_scraper_brasil_de_fato(self):
+        url = "https://www.brasildefato.com.br/2025/09/27/entry-slug"
+
+        scraper = BasePlay.get_scraper(url)
+
+        assert isinstance(scraper, BrasilDeFatoPlay)
         assert scraper.url == url
 
     def test_raise_error_if_no_scraper_is_found(self):
