@@ -3,6 +3,7 @@ from spiders.estadao import EstadaoSpider
 from spiders.folha import FolhaSpider
 from spiders.globo import GloboSpider
 from spiders.ig import IGSpider
+from spiders.imirante import ImiranteSpider
 from spiders.metropoles import MetropolesSpider
 from spiders.r7 import R7Spider
 from spiders.rbs import RBSSpider
@@ -12,6 +13,7 @@ from spiders.uol import UOLSpider
 from spiders.gazetaDoPovo import GazetaDoPovoSpider
 from spiders.maisGoias import MaisGoiasSpider
 from spiders.aliadosBrasil import AliadosBrasilSpider
+from spiders.jornaldaparaiba import JornalDaParaibaSpider
 
 __all__ = [
     BaseSpider,
@@ -19,6 +21,7 @@ __all__ = [
     FolhaSpider,
     GloboSpider,
     IGSpider,
+    ImiranteSpider,
     MetropolesSpider,
     R7Spider,
     RBSSpider,
@@ -28,4 +31,5 @@ __all__ = [
     GazetaDoPovoSpider,
     MaisGoiasSpider,
     AliadosBrasilSpider,
+    JornalDaParaibaSpider,
 ]
