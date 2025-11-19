@@ -2,6 +2,7 @@ from plays.estadao import EstadaoPlay
 from plays.folha import FolhaPlay
 from plays.globo import GloboPlay
 from plays.ig import IGPlay
+from plays.imirante import ImirantePlay
 from plays.metropoles import MetropolesPlay
 from plays.r7 import R7Play
 from plays.rbs import ClicRBSPlay
@@ -19,6 +20,7 @@ __all__ = [
     FolhaPlay,
     GloboPlay,
     IGPlay,
+    ImirantePlay,
     MetropolesPlay,
     R7Play,
     TerraPlay,

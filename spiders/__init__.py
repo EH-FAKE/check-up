@@ -3,6 +3,7 @@ from spiders.estadao import EstadaoSpider
 from spiders.folha import FolhaSpider
 from spiders.globo import GloboSpider
 from spiders.ig import IGSpider
+from spiders.imirante import ImiranteSpider
 from spiders.metropoles import MetropolesSpider
 from spiders.r7 import R7Spider
 from spiders.rbs import RBSSpider
@@ -20,6 +21,7 @@ __all__ = [
     FolhaSpider,
     GloboSpider,
     IGSpider,
+    ImiranteSpider,
     MetropolesSpider,
     R7Spider,
     RBSSpider,
