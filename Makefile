@@ -1,4 +1,4 @@
-.PHONY: start scrape scrape_no_openai crawl crawl_metropoles init_db migrate_db setup bash env stop wait-for-db prune test_playwright
+.PHONY: start scrape scrape_no_openai crawl crawl_metropoles init_db migrate_db setup bash env stop wait-for-db prune test_playwright test_portals
 
 # Configuração do ambiente
 env:
