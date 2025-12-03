@@ -1,3 +1,4 @@
+
 .PHONY: start scrape scrape_no_openai crawl crawl_metropoles init_db migrate_db setup bash env stop wait-for-db prune test_playwright
 
 # Configuração do ambiente
@@ -88,10 +89,9 @@ scrape_uol:
 scrape_folha:
 	docker compose exec scraper python scrape_no_openai.py --platform folha.uol.com.br
 
-scrape_jornaldaparaiba:
-	docker compose exec scraper python scrape_no_openai.py --platform jornaldaparaiba.com.br
+scrape_polemicaparaiba:
+	docker compose exec scraper python scrape_no_openai.py --platform polemicaparaiba.com.br
 
-	
 # Crawler para todos os portais ou específicos
 crawl:
 	docker compose run --rm scraper python crawl.py
@@ -121,8 +121,8 @@ crawl_ig:
 crawl_folha:
 	docker compose run scraper python crawl.py folhaspider
 
-crawl_jornaldaparaiba:
-	docker compose run scraper python crawl.py jornaldaparaiba
+crawl_polemicaparaiba:
+	docker compose run scraper python crawl.py polemicaparaibaspider
 
 # Workflow completo de coleta de URLs
 crawl_all_working:
@@ -135,7 +135,7 @@ crawl_all_working:
 	@make crawl_aliadosBrasil
 	@make crawl_ig
 	@make crawl_folha
-	@make crawl_jornaldaparaiba
+	@make crawl_polemicaparaiba
 	@echo "Crawl de todos os portais concluído!"
 
 # Workflow completo de scraping
@@ -149,7 +149,7 @@ scrape_all_working:
 	@make scrape_r7
 	@make scrape_uol
 	@make scrape_folha
-	@make scrape_jornaldaparaiba
+	@make scrape_polemicaparaiba
 	@echo "Scraping de todos os portais concluído!"
 
 # Pipeline completo: crawl + scrape
@@ -175,7 +175,6 @@ collect: crawl_metropoles scrape_no_openai
 collect_working: crawl_all_working scrape_all_working
 	@echo "Coleta completa de todos os portais funcionais concluída!"
 
-
 # Exibir ajuda
 help:
 	@echo "Check-up - Ferramenta de análise de anúncios de saúde"
@@ -197,6 +196,7 @@ help:
 	@echo "  make crawl_aliadosBrasil - Coleta URLs do portal AliadosBrasil"
 	@echo "  make crawl_ig          - Coleta URLs do portal IG"
 	@echo "  make crawl_folha       - Coleta URLs do portal Folha"
+	@echo "  make crawl_polemicaparaiba - Coleta URLs do portal Polêmica Paraíba"
 	@echo ""
 	@echo "=== COMANDOS DE SCRAPING (Extração de Anúncios) ==="
 	@echo "  make scrape_all_working - Executa scraping de todos os portais funcionais"
@@ -208,6 +208,7 @@ help:
 	@echo "  make scrape_r7          - Scraping do portal R7"
 	@echo "  make scrape_uol         - Scraping do portal UOL"
 	@echo "  make scrape_folha       - Scraping do portal Folha"
+	@echo "  make scrape_polemicaparaiba - Scraping do portal Polêmica Paraíba"
 	@echo ""
 	@echo "=== WORKFLOWS COMPLETOS ==="
 	@echo "  make pipeline_complete  - Executa crawl + scraping de todos os portais"
@@ -217,7 +218,6 @@ help:
 	@echo "  make init_db           - Inicializa as tabelas do banco de dados"
 	@echo "  make migrate_db        - Executa as migrações do banco de dados"
 	@echo "  make prune             - Remove containers, redes e imagens não utilizadas"
-	@echo "  make test_playwright   - Testa se a instalação do Playwright está funcionando"
 
 .PHONY: start scrape scrape_no_openai scrape_fixed scrape_working install run-backend run-frontend docker-run-backend docker-run-frontend docker-build-backend docker-build-frontend all stop down
 
@@ -235,24 +235,24 @@ run-frontend:
 
 # Rodar backend (server-web) com Docker
 run-backend-docker:
-	docker compose up server-web
+	docker-compose up server-web
 
 # Rodar frontend (client-web) com Docker
 run-frontend-docker:
-	docker compose up client-web
+	docker-compose up client-web
 
 # Construir e rodar backend (server-web) com Docker
 build-backend-docker:
-	docker compose up --build server-web
+	docker-compose up --build server-web
 
 # Construir e rodar frontend (client-web) com Docker
 build-frontend-docker:
-	docker compose up --build client-web
+	docker-compose up --build client-web
 
 # Rodar todos os serviços (backend, frontend, minio, db, scraper)
 all:
-	docker compose up -d
+	docker-compose up -d
 
 # Parar todos os serviços
 down:
-	docker compose down
+	docker-compose down
