@@ -137,9 +137,10 @@ jobs:
           pip install pipenv
           pipenv install --dev --system
 
-      - name: Install Playwright browsers
+      - name: Setup test environment and install Playwright browsers
         run: |
-          pipenv run playwright install --with-deps firefox
+          chmod +x .github/scripts/setup_tests_ci.sh
+          .github/scripts/setup_tests_ci.sh
 
       - name: Prepare test environment
         run: |
@@ -182,8 +183,26 @@ jobs:
       - name: Initialize database
         run: python create_db_ci.py
 
-      - name: Run tests
+      - name: Run general tests
         run: pytest -xvs tests/
+      
+      - name: Run portal tests (plays and spiders)
+        run: |
+          chmod +x ./run_portal_tests.sh
+          pip install pytest pytest-cov
+          ./run_portal_tests.sh
+        
+      - name: Generate test coverage report
+        run: |
+          python -m pytest tests/ --cov=plays --cov=spiders --cov-report=xml
+          
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
 
       - name: Cleanup containers
         if: always()

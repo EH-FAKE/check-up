@@ -1,0 +1,105 @@
+name: Portal Tests
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'plays/**'
+      - 'spiders/**'
+      - 'tests/plays/**'
+      - 'tests/spiders/**'
+      - 'run_portal_tests.sh'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'plays/**'
+      - 'spiders/**'
+      - 'tests/plays/**'
+      - 'tests/spiders/**'
+      - 'run_portal_tests.sh'
+  # Permite execução manual também
+  workflow_dispatch:
+
+jobs:
+  test-portals:
+    name: Test Portal Components
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.12"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-browsers-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            playwright-browsers-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-cov playwright
+          pip install pipenv
+          pipenv install --dev --system
+
+      - name: Setup Playwright
+        run: |
+          playwright install --with-deps firefox
+          chmod -R 777 ~/.cache/ms-playwright
+
+      - name: Run portal tests
+        run: |
+          chmod +x ./run_portal_tests.sh
+          ./run_portal_tests.sh
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage.xml
+          flags: portal-tests
+          name: portal-coverage
+          fail_ci_if_error: false
+
+      - name: Generate test report
+        if: always()
+        run: |
+          echo "## Portal Tests Results" > portal-test-report.md
+          echo "### Summary" >> portal-test-report.md
+          
+          if [ -f "tests/plays/test_metropoles.py" ]; then
+            echo "- ✅ MetropolesPlay tests executed" >> portal-test-report.md
+          else
+            echo "- ❌ MetropolesPlay tests not found" >> portal-test-report.md
+          fi
+          
+          if [ -f "tests/spiders/test_metropoles.py" ]; then
+            echo "- ✅ MetropolesSpider tests executed" >> portal-test-report.md
+          else
+            echo "- ❌ MetropolesSpider tests not found" >> portal-test-report.md
+          fi
+          
+          echo "### Coverage" >> portal-test-report.md
+          
+          if [ -f "coverage.xml" ]; then
+            COV_LINES=$(grep -o 'line-rate="[0-9.]*"' coverage.xml | head -1 | grep -o '[0-9.]*')
+            COV_PERCENT=$(echo "$COV_LINES * 100" | bc)
+            echo "- Overall coverage: ${COV_PERCENT}%" >> portal-test-report.md
+          else
+            echo "- Coverage report not generated" >> portal-test-report.md
+          fi
+          
+          cat portal-test-report.md
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: portal-test-report
+          path: portal-test-report.md
