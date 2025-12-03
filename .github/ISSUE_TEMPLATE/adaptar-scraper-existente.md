@@ -1,11 +1,9 @@
 ---
-name: "\U0001F527 Adaptar Scraper Existente"
-about: Adaptar um scraper existente para extrair conteúdo de notícias (título, descrição,
-  corpo, tags)
-title: "[ADAPTAÇÃO] Portal: [NOME_DO_PORTAL]"
-labels: ''
+name: 🔧 Adaptar Scraper Existente
+about: Adaptar um scraper existente para extrair conteúdo de notícias (título, descrição, corpo, tags)
+title: '[ADAPTAÇÃO] Portal: [NOME_DO_PORTAL]'
+labels: ['adaptação', 'scraper', 'notícias']
 assignees: ''
-
 ---
 
 ## 📋 Informações do Portal
