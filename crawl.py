@@ -4,12 +4,10 @@ from scrapy.crawler import CrawlerProcess
 
 from plog import logger
 from spiders.base import BaseSpider
-from spiders.polemicaparaiba import PolemicaParaibaSpider
 
 process = CrawlerProcess(
     settings={
-        # Disable pipelines to avoid SQLAlchemy import hanging
-        "ITEM_PIPELINES": {},
+        "ITEM_PIPELINES": {"pipelines.PostgresPipeline": 300},
         # Add browser-like headers
         "DEFAULT_REQUEST_HEADERS": {
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -25,8 +23,6 @@ process = CrawlerProcess(
         "RETRY_ENABLED": True,
         "RETRY_TIMES": 3,
         "RETRY_HTTP_CODES": [500, 502, 503, 504, 400, 403, 404, 408],
-        # Fix for import hanging - force AsyncIO reactor early
-        "TWISTED_REACTOR": "twisted.internet.asyncioreactor.AsyncioSelectorReactor",
     }
 )
 

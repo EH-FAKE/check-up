@@ -86,9 +86,6 @@ scrape_folha:
 scrape_cartacapital:
 	docker compose exec scraper python scrape_no_openai.py --platform cartacapital.com.br
 
-scrape_polemicaparaiba:
-	docker compose exec scraper python scrape_no_openai.py --platform polemicaparaiba.com.br
-
 # Crawler para todos os portais ou específicos
 crawl:
 	docker compose run --rm scraper python crawl.py
@@ -121,9 +118,6 @@ crawl_folha:
 crawl_cartacapital:
 	docker compose run scraper python crawl.py cartacapitalspider
 
-crawl_polemicaparaiba:
-	docker compose run scraper python crawl.py polemicaparaibaspider
-
 # Workflow completo de coleta de URLs
 crawl_all_working:
 	@echo "Executando crawl de todos os portais funcionais..."
@@ -136,7 +130,6 @@ crawl_all_working:
 	@make crawl_ig
 	@make crawl_folha
 	@make crawl_cartacapital
-	@make crawl_polemicaparaiba
 	@echo "Crawl de todos os portais concluído!"
 
 # Workflow completo de scraping
@@ -151,7 +144,6 @@ scrape_all_working:
 	@make scrape_uol
 	@make scrape_folha
 	@make scrape_cartacapital
-	@make scrape_polemicaparaiba
 	@echo "Scraping de todos os portais concluído!"
 
 # Pipeline completo: crawl + scrape
@@ -199,7 +191,6 @@ help:
 	@echo "  make crawl_ig          - Coleta URLs do portal IG"
 	@echo "  make crawl_folha       - Coleta URLs do portal Folha"
 	@echo "  make crawl_cartacapital - Coleta URLs do portal CartaCapital"
-	@echo "  make crawl_polemicaparaiba - Coleta URLs do portal Polêmica Paraíba"
 	@echo ""
 	@echo "=== COMANDOS DE SCRAPING (Extração de Anúncios) ==="
 	@echo "  make scrape_all_working - Executa scraping de todos os portais funcionais"
@@ -212,7 +203,6 @@ help:
 	@echo "  make scrape_uol         - Scraping do portal UOL"
 	@echo "  make scrape_folha       - Scraping do portal Folha"
 	@echo "  make scrape_cartacapital - Scraping do portal CartaCapital"
-	@echo "  make scrape_polemicaparaiba - Scraping do portal Polêmica Paraíba"
 	@echo ""
 	@echo "=== WORKFLOWS COMPLETOS ==="
 	@echo "  make pipeline_complete  - Executa crawl + scraping de todos os portais"
